@@ -18,3 +18,28 @@ model User {
   password  String @db.Text
   role  String?
 }
+model Job {
+  id                Int      @id @default(autoincrement())
+  job_code          String   @unique
+  title             String
+  city_1            String
+  city_2            String?
+  city_3            String?
+  publication_date  DateTime
+  deadline          DateTime
+  age               Int?
+  qualification     String   @db.Text
+  skill             String?  @db.Text
+  responsibility    String?  @db.Text
+  special_info      String?  @db.Text
+  doc1_title        String?
+  doc1_attachment   String?
+  doc2_title        String?
+  doc2_attachment   String?
+  req1_doc_title    String?
+  req2_doc_title    String?
+  job_type          String
+  email             String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+}
