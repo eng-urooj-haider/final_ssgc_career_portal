@@ -22,9 +22,7 @@ model Job {
   id                Int      @id @default(autoincrement())
   job_code          String   @unique
   title             String
-  city_1            String
-  city_2            String?
-  city_3            String?
+  city              Json 
   publication_date  DateTime
   deadline          DateTime
   age               Int?
