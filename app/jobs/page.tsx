@@ -22,15 +22,18 @@ const columns = [
     accessorKey: "title",
     header: "Title",
     meta: { width: "28%" },
+    cell: ({ row }) => (
+      <Link
+        href={`/jobs/${row.original.id}`}
+        className="font-medium text-[#0B2E63] text-[#F5A623] underline"
+      >
+        {row.original.title}
+      </Link>
+    ),
   },
   {
-    accessorKey: "job_type",
-    header: "Type",
-    meta: { width: "14%" },
-  },
-  {
-    accessorKey: "created_at_formatted",
-    header: "Created At",
+    accessorKey: "deadline_formatted",
+    header: "Deadline",
     meta: { width: "14%" },
   },
   {
@@ -47,7 +50,7 @@ const columns = [
           View
         </Link>
         <Link
-          href={`/jobs/${row.original.id}/edit`}
+          href={`jobs/${row.original.id}/edit`}
           className="rounded-lg border border-[#0B2E63]/20 px-2.5 py-1 text-xs font-medium text-[#0B2E63] transition hover:border-[#0B2E63] hover:bg-[#0B2E63] hover:text-white"
         >
           Edit

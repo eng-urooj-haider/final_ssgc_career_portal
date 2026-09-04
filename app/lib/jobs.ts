@@ -1,5 +1,6 @@
-// app/lib/jobs.ts   (renamed — lowercase "jobs" to match the import)
+// app/lib/jobs.ts
 import axios from "axios";
+import type { JobFormData } from "../components/jobs/JobForm";
 
 interface FetchJobsParams {
   pageIndex: number;
@@ -35,3 +36,53 @@ export const getJobs = async ({
   });
   return response.data;
 };
+
+interface JobResponse {
+  message: string;
+  data: {
+    id: number;
+  };
+}
+
+// Shared FormData-building logic used by both create and update
+function buildJobFormData(data: JobFormData): FormData {
+  const body = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (key === "cities") {
+      body.append(key, JSON.stringify(value));
+    } else if (value !== null) {
+      body.append(key, value as string | Blob);
+    }
+  });
+  return body;
+}
+
+export const createJob = async (data: JobFormData): Promise<JobResponse> => {
+  const body = buildJobFormData(data);
+  const response = await axios.post("/api/jobs", body, {
+    withCredentials: true,
+  });
+  return response.data;
+};
+
+export const updateJob = async (
+  id: string | number,
+  data: JobFormData,
+): Promise<JobResponse> => {
+  const body = buildJobFormData(data);
+  const response = await axios.put(`/api/jobs/${id}`, body, {
+    withCredentials: true,
+  });
+  return response.data;
+};
+export const getJob = async (id: string): Promise<JobsResponse> => {
+  const response = await axios.get(`/api/jobs/${id}`);
+  return response.data;
+};
+
+interface JobResponse {
+  message: string;
+  data: {
+    id: number;
+  };
+}
