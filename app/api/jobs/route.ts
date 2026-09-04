@@ -3,6 +3,55 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
+// app/api/job/route.ts
+
+export const GET = async (req: NextRequest) => {
+  try {
+    const { searchParams } = new URL(req.url);
+    const page = Number(searchParams.get("page") ?? 1);
+    const limit = Number(searchParams.get("limit") ?? 10);
+    const search = searchParams.get("search") ?? "";
+
+    const where = search
+      ? { title: { contains: search } }
+      : {};
+
+    const [job, total] = await Promise.all([
+      prisma.job.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: "desc" },
+      }),
+      prisma.job.count({ where }),
+    ]);
+
+    // Format created_at here, so the frontend never has to touch raw Date objects
+    const data = job.map((job) => ({
+      ...job,
+      created_at_formatted: new Date(job.created_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
+    }));
+
+    return NextResponse.json({
+      data,
+      total,
+      last_page: Math.ceil(total / limit),
+      from: total === 0 ? 0 : (page - 1) * limit + 1,
+      to: Math.min(page * limit, total),
+    });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: "Failed to fetch job" },
+      { status: 500 }
+    );
+  }
+};
+
 export const POST = async (req: NextRequest) => {
   try {
     const data = await req.formData();

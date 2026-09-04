@@ -1,4 +1,5 @@
-"use client"
+"use client";
+
 import { useState, useEffect, useRef } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 // import jsPDF from "jspdf";
@@ -10,19 +11,19 @@ import {
   globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
+  columnVisibilityFeature,   // ← add this import
   createFilteredRowModel,
   createSortedRowModel,
   createPaginatedRowModel,
   flexRender,
 } from "@tanstack/react-table";
-// import * as XLSX from "xlsx";
 
-// Features declared once, outside the component — they don't change per render
 const features = tableFeatures({
   columnFilteringFeature,
   globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
+  columnVisibilityFeature,   // ← add this here too
   filteredRowModel: createFilteredRowModel(),
   sortedRowModel: createSortedRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
@@ -100,51 +101,51 @@ const DataTable = ({
   const rows = table.getRowModel().rows;
   const pageIndex = pagination.pageIndex;
 
-//   const handleExportExcel = () => {
-//     const exportRows = table.getFilteredRowModel().rows;
-//     const exportData = exportRows.map((row) => {
-//       const rowData = {};
-//       row.getVisibleCells().forEach((cell) => {
-//         if (cell.column.id === "actions") return;
-//         const header = cell.column.columnDef.header;
-//         rowData[header] = cell.getValue();
-//       });
-//       return rowData;
-//     });
+  // const handleExportExcel = () => {
+  //   const exportRows = table.getFilteredRowModel().rows;
+  //   const exportData = exportRows.map((row) => {
+  //     const rowData = {};
+  //     row.getVisibleCells().forEach((cell) => {
+  //       if (cell.column.id === "actions") return;
+  //       const header = cell.column.columnDef.header;
+  //       rowData[header] = cell.getValue();
+  //     });
+  //     return rowData;
+  //   });
 
-//     const worksheet = XLSX.utils.json_to_sheet(exportData);
-//     const workbook = XLSX.utils.book_new();
-//     XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
-//     XLSX.writeFile(workbook, "export.xlsx");
-//   };
+  //   const worksheet = XLSX.utils.json_to_sheet(exportData);
+  //   const workbook = XLSX.utils.book_new();
+  //   XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+  //   XLSX.writeFile(workbook, "export.xlsx");
+  // };
 
-//   const handleExportPdf = () => {
-//     const doc = new jsPDF();
-//     doc.setFontSize(14);
-//     doc.text("E-Kachehri", 14, 15);
+  // const handleExportPdf = () => {
+  //   const doc = new jsPDF();
+  //   doc.setFontSize(14);
+  //   doc.text("E-Kachehri", 14, 15);
 
-//     const exportRows = table.getFilteredRowModel().rows;
-//     const tableData = exportRows.map((row) =>
-//       row
-//         .getVisibleCells()
-//         .filter((cell) => cell.column.id !== "actions")
-//         .map((cell) => String(cell.getValue() ?? "")),
-//     );
-//     const tableHeaders = table
-//       .getHeaderGroups()[0]
-//       .headers.filter((h) => h.column.id !== "actions")
-//       .map((h) => h.column.columnDef.header);
+  //   const exportRows = table.getFilteredRowModel().rows;
+  //   const tableData = exportRows.map((row) =>
+  //     row
+  //       .getVisibleCells()
+  //       .filter((cell) => cell.column.id !== "actions")
+  //       .map((cell) => String(cell.getValue() ?? "")),
+  //   );
+  //   const tableHeaders = table
+  //     .getHeaderGroups()[0]
+  //     .headers.filter((h) => h.column.id !== "actions")
+  //     .map((h) => h.column.columnDef.header);
 
-//     autoTable(doc, {
-//       head: [tableHeaders],
-//       body: tableData,
-//       startY: 22,
-//       styles: { fontSize: 9 },
-//       headStyles: { fillColor: [245, 130, 31] },
-//     });
+  //   autoTable(doc, {
+  //     head: [tableHeaders],
+  //     body: tableData,
+  //     startY: 22,
+  //     styles: { fontSize: 9 },
+  //     headStyles: { fillColor: [245, 130, 31] },
+  //   });
 
-//     doc.save("ekachehri-report.pdf");
-//   };
+  //   doc.save("ekachehri-report.pdf");
+  // };
 
   return (
     <div className="relative w-full min-w-0 overflow-x-auto overflow-y-visible rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
@@ -178,7 +179,7 @@ const DataTable = ({
           />
         </div>
 
-        {/* {showExportButtons && (
+        {showExportButtons && (
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleExportExcel}
@@ -196,7 +197,7 @@ const DataTable = ({
               {totalRows} {totalRows === 1 ? "result" : "results"}
             </span>
           </div>
-        )} */}
+        )}
       </div>
 
       {/* Table */}
@@ -205,7 +206,7 @@ const DataTable = ({
           <colgroup>
             {columns.map((col) => (
               <col
-                key={col.accessorKey ?? col.id}
+                key={col.id ?? col.accessorKey}
                 style={{ width: col.meta?.width ?? "auto" }}
               />
             ))}
