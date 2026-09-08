@@ -76,7 +76,7 @@ function DetailRow({ label, html }: { label: string; html?: string | null }) {
 function JobPosting({ job }: { job: JobRecord }) {
   const applyHref = job.email
     ? `mailto:${job.email}`
-    : `/careers/apply/${job.id}`;
+    : `/user/dashboard/?jobId=${job.id}`;
 
   return (
     <article className="mb-10 overflow-hidden rounded-sm border border-[#C9D9EE] bg-white shadow-[0_1px_3px_rgba(15,58,145,0.06)]">

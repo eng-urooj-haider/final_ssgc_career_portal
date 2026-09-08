@@ -11,10 +11,7 @@ interface RegisterCredentials {
   first_name: string;
   last_name: string;
   gender: string;
-<<<<<<< HEAD
   cnic: string;
-=======
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
 }
 
 interface RegisterResponse {
@@ -91,13 +88,10 @@ function validateField(
       if (!value) return "Please select a gender.";
       return undefined;
 
-<<<<<<< HEAD
     case "cnic":
       if (!value) return "CNIC is required.";
       return undefined;
 
-=======
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
     default:
       return undefined;
   }
@@ -123,10 +117,7 @@ export default function Page() {
     first_name: "",
     last_name: "",
     gender: "",
-<<<<<<< HEAD
     cnic: "",
-=======
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<
@@ -136,7 +127,7 @@ export default function Page() {
   const RegisterMutation = useMutation({
     mutationFn: RegisterUser,
     onSuccess: () => {
-      router.push("/login");
+      router.push("/user/dashboard");
     },
     onError: (err: AxiosError<ApiErrorResponse>) => {
       console.log(
@@ -410,7 +401,6 @@ export default function Page() {
               )}
             </div>
 
-<<<<<<< HEAD
             <div>
               <label
                 htmlFor="last_name"
@@ -435,8 +425,6 @@ export default function Page() {
               )}
             </div>
 
-=======
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
             {/* Register Button */}
             <button
               type="submit"

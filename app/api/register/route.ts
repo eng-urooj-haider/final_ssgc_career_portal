@@ -7,6 +7,10 @@ interface RegisterBody {
   email: string;
   password: string;
   role?: string;
+  cnic: string;
+  first_name: string;
+  last_name: string;
+  gender: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -35,15 +39,24 @@ export async function POST(req: NextRequest) {
         role: body.role ?? "user",
       },
     });
+    const profile = await prisma.profile.create({
+      data: {
+        user_id: user.id,
+        cnic: body.cnic,
+        first_name: body.first_name,
+        last_name: body.last_name,
+        gender: body.gender,
+      },
+    });
 
     //token workout
-   const token = createJwtToken(user)
+    const token = createJwtToken(user);
     const response = NextResponse.json({
       message: "User created successfully",
       data: { id: user.id, email: user.email, role: user.role },
     });
 
-   setTokenCookie(response , token)
+    setTokenCookie(response, token);
     return response;
   } catch (err) {
     console.error(err);

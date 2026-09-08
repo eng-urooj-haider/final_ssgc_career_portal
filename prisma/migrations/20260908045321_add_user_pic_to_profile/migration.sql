@@ -1,0 +1,2 @@
+ALTER TABLE `profile`
+ADD COLUMN `user_pic` VARCHAR(191) NULL AFTER `cnic`;

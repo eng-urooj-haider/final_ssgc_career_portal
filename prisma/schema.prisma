@@ -13,11 +13,11 @@ datasource db {
 }
 
 model User {
-<<<<<<< HEAD
   id       Int     @id @default(autoincrement())
   email    String  @unique
   password String  @db.Text
   role     String?
+  profile  Profile?
 }
 
 model Job {
@@ -44,7 +44,7 @@ model Job {
   updated_at       DateTime @updatedAt
 }
 
-model profile {
+model Profile {
   id                   Int       @id @default(autoincrement())
   user_id              Int       @unique
   first_name           String?
@@ -58,7 +58,8 @@ model profile {
   birth_city           String?
   birth_city_other     String?
   is_pakistani         String?   @db.VarChar(3)
-  cnic                 String?   @db.VarChar(15)
+  cnic                 String?   @db.VarChar(100)
+  user_pic             String?
   passport_no          String?   @db.VarChar(15)
   domicile             String?   @db.VarChar(20)
   mobile_prefix        String?   @db.VarChar(10)
@@ -74,12 +75,13 @@ model profile {
   ssgc_employee_number String?   @db.VarChar(10)
   created_at           DateTime  @default(now())
   updated_at           DateTime  @updatedAt
+  user  User  @relation(fields: [user_id], references: [id])
 }
 
 model cities {
   id         Int      @id @default(autoincrement())
-  cities     String
-  provience  String
+  city     String
+  province  String
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
@@ -90,33 +92,3 @@ model countries {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
-=======
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  password  String @db.Text
-  role  String?
-}
-model Job {
-  id                Int      @id @default(autoincrement())
-  job_code          String   @unique
-  title             String
-  city              Json 
-  publication_date  DateTime
-  deadline          DateTime
-  age               Int?
-  qualification     String   @db.Text
-  skill             String?  @db.Text
-  responsibility    String?  @db.Text
-  special_info      String?  @db.Text
-  doc1_title        String?
-  doc1_attachment   String?
-  doc2_title        String?
-  doc2_attachment   String?
-  req1_doc_title    String?
-  req2_doc_title    String?
-  job_type          String
-  email             String?
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
-}
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991

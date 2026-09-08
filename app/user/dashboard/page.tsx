@@ -1,15 +1,11 @@
 "use client";
 
-<<<<<<< HEAD
 import React, {
   useState,
   useRef,
   type ReactNode,
   type ChangeEvent,
 } from "react";
-=======
-import React, { useState, useRef, type ReactNode, type ChangeEvent } from "react";
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
 import {
   User,
   Briefcase,
@@ -24,6 +20,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import axios from "axios";
+import { GetCities, GetCountries } from "@/app/lib/dashboard";
+import { useQuery } from "@tanstack/react-query";
 
 type TabId =
   | "photo"
@@ -86,19 +84,22 @@ interface FieldProps {
   children: ReactNode;
   required?: boolean;
   error?: string;
+  className?: string; // 👈 added — was used (`className="w-1/3"`) but not declared
 }
 
-function Field({ label, children, required, error }: FieldProps) {
+function Field({ label, children, required, error, className }: FieldProps) {
   return (
-    <label className="block">
-      <span className="block text-sm font-semibold text-slate-800 mb-1.5">
-        {label}
-        {required && (
-          <span className="ml-0.5" style={{ color: flame.edge }}>
-            *
-          </span>
-        )}
-      </span>
+    <label className={`block ${className || ""}`}>
+      {label && (
+        <span className="block text-sm font-semibold text-slate-800 mb-1.5">
+          {label}
+          {required && (
+            <span className="ml-0.5" style={{ color: flame.edge }}>
+              *
+            </span>
+          )}
+        </span>
+      )}
       {children}
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </label>
@@ -147,20 +148,46 @@ function FlameTextarea(
 interface PhotoTabProps {
   image: string;
   onChange: (file: File | null) => void;
-  error?: string;
+  error?: string; // 👈 consistent name — was `error` in the type but `errors` used in destructuring
 }
 
 function PhotoTab({ image, onChange, error }: PhotoTabProps) {
   const [preview, setPreview] = useState<string | null>(image || null);
+  const [hasLocalSelection, setHasLocalSelection] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null;
     if (file) {
+      setHasLocalSelection(true);
       setPreview(URL.createObjectURL(file));
       onChange(file);
     }
   }
+
+  const fetchUserProfile = async () => {
+    const res = await axios.get("/api/user_profile", { withCredentials: true });
+    return res.data.profile;
+  };
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile_pic"],
+    queryFn: fetchUserProfile,
+  });
+
+  React.useEffect(() => {
+    if (profile?.user_pic && !hasLocalSelection) {
+      setPreview(profile.user_pic);
+    }
+  }, [profile, hasLocalSelection]);
+
+  React.useEffect(() => {
+    return () => {
+      if (preview?.startsWith("blob:")) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
 
   return (
     <div>
@@ -215,23 +242,57 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
   );
 }
 
-<<<<<<< HEAD
+// 👇 Full shape of every field PersonalTab actually reads/writes
+interface PersonalFormData {
+  father_name: string;
+  marital_status: string;
+  children: string;
+  date_of_birth: string;
+  birth_country: string;
+  birth_city: string;
+  birth_city_other: string;
+  is_pakistani: string;
+  cnic: string;
+  passport_no: string;
+  domicile: string;
+  mobile_prefix: string;
+  mobile_number: string;
+  home_prefix: string;
+  home_number: string;
+  office_prefix: string;
+  office_number: string;
+  current_address: string;
+  permanent_address: string;
+  already_worked_ssgc: string;
+  ssgc_employee_name: string;
+  ssgc_employee_number: string;
+}
+
 interface PersonalTabProps {
-  formData: Record<string, string>;
+  formData: PersonalFormData;
   onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   errors: Record<string, string>;
 }
 
 function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
-=======
-function PersonalTab({
-  formData,
-  onChange,
-}: {
-  formData: Record<string, string>;
-  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-}) {
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
+  const {
+    data: cities,
+    isLoading: isLoadingCities,
+    error: citiesError,
+  } = useQuery({
+    queryKey: ["cities"],
+    queryFn: GetCities,
+  });
+
+  const {
+    data: countries,
+    isLoading: isLoadingCountries,
+    error: countriesError,
+  } = useQuery({
+    queryKey: ["countries"],
+    queryFn: GetCountries,
+  });
+
   return (
     <div>
       <SectionHeading
@@ -239,21 +300,7 @@ function PersonalTab({
         description="This information is used across your applications."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-<<<<<<< HEAD
-        
-        {/* Full Name */}
-        <Field label="Full Name" required error={errors.full_name}>
-          <FlameInput
-            name="full_name"
-            value={formData.full_name || ""}
-            onChange={onChange}
-            placeholder="e.g. Urooj Fatima"
-            maxLength={100}
-          />
-        </Field>
-
-        {/* Father's Name */}
-        <Field label="Father's Name" required error={errors.father_name}>
+        <Field label="Father / Husband's Name" required error={errors.father_name}>
           <FlameInput
             name="father_name"
             value={formData.father_name || ""}
@@ -263,13 +310,12 @@ function PersonalTab({
           />
         </Field>
 
-        {/* Marital Status */}
-        <Field label="Marital Status" error={errors.marital_status}>
+        <Field label="Marital Status" required error={errors.marital_status}>
           <select
             name="marital_status"
             value={formData.marital_status || ""}
             onChange={onChange}
-            className="w-full rounded-md border border-gray-300 p-2 text-sm"
+            className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
           >
             <option value="">Select status</option>
             <option value="Single">Single</option>
@@ -278,20 +324,25 @@ function PersonalTab({
           </select>
         </Field>
 
-        {/* Children */}
-        <Field label="No. of Children" error={errors.children}>
-          <FlameInput
-            type="number"
+        {/* 👇 fixed: was name="marital_status" — now correctly "children" */}
+        <Field label="No. of Children" required error={errors.children}>
+          <select
             name="children"
             value={formData.children || ""}
             onChange={onChange}
-            placeholder="0"
-            max={99}
-          />
+            className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
+          >
+            <option value="">Select</option>
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5+">5+</option>
+          </select>
         </Field>
 
-        {/* Date of Birth */}
-        <Field label="Date of Birth" error={errors.date_of_birth}>
+        <Field label="Date of Birth" required error={errors.date_of_birth}>
           <FlameInput
             type="date"
             name="date_of_birth"
@@ -300,75 +351,64 @@ function PersonalTab({
           />
         </Field>
 
-        {/* Birth Country */}
-        <Field label="Birth Country" error={errors.birth_country}>
-          <FlameInput
+        <Field label="Birth Country" required error={errors.birth_country}>
+          <select
             name="birth_country"
             value={formData.birth_country || ""}
             onChange={onChange}
-            placeholder="Pakistan"
-          />
+            disabled={isLoadingCountries}
+            className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
+          >
+            <option value="">
+              {isLoadingCountries ? "Loading countries..." : "Select country"}
+            </option>
+            {countriesError && <option disabled>Failed to load countries</option>}
+            {countries?.map((country: { id: number; country: string }) => (
+              <option key={country.id} value={country.country}>
+                {country.country}
+              </option>
+            ))}
+          </select>
         </Field>
 
-        {/* Birth City */}
-        <Field label="Birth City" error={errors.birth_city}>
-          <FlameInput
+        <Field label="Birth City" required error={errors.birth_city}>
+          <select
             name="birth_city"
             value={formData.birth_city || ""}
-=======
-        <Field label="Full name" required>
-          <FlameInput
-            name="fullName"
-            value={formData.fullName || ""}
             onChange={onChange}
-            placeholder="e.g. Urooj Fatima"
-          />
-        </Field>
-        <Field label="Email address" required>
-          <FlameInput
-            type="email"
-            name="email"
-            value={formData.email || ""}
-            onChange={onChange}
-            placeholder="you@example.com"
-          />
-        </Field>
-        <Field label="Phone number">
-          <FlameInput
-            name="phone"
-            value={formData.phone || ""}
-            onChange={onChange}
-            placeholder="+92 300 0000000"
-          />
-        </Field>
-        <Field label="City">
-          <FlameInput
-            name="city"
-            value={formData.city || ""}
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
-            onChange={onChange}
-            placeholder="Karachi"
-          />
-        </Field>
-<<<<<<< HEAD
-
-        {/* Birth City Other (Conditionally shown or optional) */}
-        <Field label="Birth City (Other)" error={errors.birth_city_other}>
-          <FlameInput
-            name="birth_city_other"
-            value={formData.birth_city_other || ""}
-            onChange={onChange}
-            placeholder="If other city"
-          />
+            disabled={isLoadingCities}
+            className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
+          >
+            <option value="">
+              {isLoadingCities ? "Loading cities..." : "Select city"}
+            </option>
+            {citiesError && <option disabled>Failed to load cities</option>}
+            {cities?.map((city: { id: number; city: string }) => (
+              <option key={city.id} value={city.city}>
+                {city.city}
+              </option>
+            ))}
+            <option value="other">Other</option>
+          </select>
         </Field>
 
-        {/* Is Pakistani */}
+        {formData.birth_city === "other" && (
+          <Field label="Birth City (Other)" error={errors.birth_city_other}>
+            <FlameInput
+              name="birth_city_other"
+              value={formData.birth_city_other || ""}
+              onChange={onChange}
+              placeholder="Enter your city"
+            />
+          </Field>
+        )}
+
         <Field label="Is Pakistani?" error={errors.is_pakistani}>
           <select
             name="is_pakistani"
             value={formData.is_pakistani || ""}
             onChange={onChange}
-            className="w-full rounded-md border border-gray-300 p-2 text-sm"
+            className="w-full rounded-md border border-gray-300 p-2 text-sm text-black"
           >
             <option value="">Select</option>
             <option value="Yes">Yes</option>
@@ -376,30 +416,16 @@ function PersonalTab({
           </select>
         </Field>
 
-        {/* CNIC */}
         <Field label="CNIC" error={errors.cnic}>
-=======
-        <Field label="Date of birth">
-          <FlameInput
-            type="date"
-            name="dob"
-            value={formData.dob || ""}
-            onChange={onChange}
-          />
-        </Field>
-        <Field label="CNIC / National ID">
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
           <FlameInput
             name="cnic"
             value={formData.cnic || ""}
             onChange={onChange}
             placeholder="00000-0000000-0"
-<<<<<<< HEAD
             maxLength={15}
           />
         </Field>
 
-        {/* Passport Number */}
         <Field label="Passport Number" error={errors.passport_no}>
           <FlameInput
             name="passport_no"
@@ -410,7 +436,6 @@ function PersonalTab({
           />
         </Field>
 
-        {/* Domicile */}
         <Field label="Domicile" error={errors.domicile}>
           <FlameInput
             name="domicile"
@@ -423,37 +448,68 @@ function PersonalTab({
 
         {/* Mobile Number Group */}
         <div className="flex gap-2">
-          <Field label="Mobile Prefix" className="w-1/3" error={errors.mobile_prefix}>
-            <FlameInput name="mobile_prefix" value={formData.mobile_prefix || "+92"} onChange={onChange} maxLength={10} />
+          <Field label="Code" className="w-1/3" error={errors.mobile_prefix}>
+            <FlameInput
+              name="mobile_prefix"
+              value={formData.mobile_prefix || "+92"}
+              onChange={onChange}
+              maxLength={10}
+            />
           </Field>
           <Field label="Mobile Number" className="w-2/3" error={errors.mobile_number}>
-            <FlameInput name="mobile_number" value={formData.mobile_number || ""} onChange={onChange} placeholder="3000000000" maxLength={10} />
+            <FlameInput
+              name="mobile_number"
+              value={formData.mobile_number || ""}
+              onChange={onChange}
+              placeholder="3000000000"
+              maxLength={10}
+            />
           </Field>
         </div>
 
-        {/* Home Number Group */}
+        {/* Home Number Group — 👇 fixed: fields renamed to home_prefix/home_number */}
         <div className="flex gap-2">
-          <Field label="Home Prefix" className="w-1/3" error={errors.home_prefix}>
-            <FlameInput name="home_prefix" value={formData.home_prefix || ""} onChange={onChange} maxLength={10} />
+          <Field label="Code" className="w-1/3" error={errors.home_prefix}>
+            <FlameInput
+              name="home_prefix"
+              value={formData.home_prefix || "+92"}
+              onChange={onChange}
+              maxLength={10}
+            />
           </Field>
-          <Field label="Home Number" className="w-2/3" error={errors.home_number}>
-            <FlameInput name="home_number" value={formData.home_number || ""} onChange={onChange} maxLength={10} />
+          <Field label="Home Phone" className="w-2/3" error={errors.home_number}>
+            <FlameInput
+              name="home_number"
+              value={formData.home_number || ""}
+              onChange={onChange}
+              placeholder="3000000000"
+              maxLength={10}
+            />
           </Field>
         </div>
 
-        {/* Office Number Group */}
+        {/* Office Number Group — 👇 fixed: fields renamed to office_prefix/office_number */}
         <div className="flex gap-2">
-          <Field label="Office Prefix" className="w-1/3" error={errors.office_prefix}>
-            <FlameInput name="office_prefix" value={formData.office_prefix || ""} onChange={onChange} maxLength={10} />
+          <Field label="Code" className="w-1/3" error={errors.office_prefix}>
+            <FlameInput
+              name="office_prefix"
+              value={formData.office_prefix || "+92"}
+              onChange={onChange}
+              maxLength={10}
+            />
           </Field>
-          <Field label="Office Number" className="w-2/3" error={errors.office_number}>
-            <FlameInput name="office_number" value={formData.office_number || ""} onChange={onChange} maxLength={10} />
+          <Field label="Office Phone" className="w-2/3" error={errors.office_number}>
+            <FlameInput
+              name="office_number"
+              value={formData.office_number || ""}
+              onChange={onChange}
+              placeholder="3000000000"
+              maxLength={10}
+            />
           </Field>
         </div>
-
       </div>
 
-      {/* Addresses */}
       <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
         <Field label="Current Address" error={errors.current_address}>
           <FlameTextarea
@@ -477,7 +533,6 @@ function PersonalTab({
         </Field>
       </div>
 
-      {/* SSGC Work History Section */}
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-5">
         <Field label="Already worked at SSGC?" error={errors.already_worked_ssgc}>
           <select
@@ -503,7 +558,6 @@ function PersonalTab({
                 maxLength={100}
               />
             </Field>
-
             <Field label="SSGC Employee Number" error={errors.ssgc_employee_number}>
               <FlameInput
                 name="ssgc_employee_number"
@@ -515,29 +569,11 @@ function PersonalTab({
             </Field>
           </>
         )}
-=======
-          />
-        </Field>
-      </div>
-      <div className="mt-5">
-        <Field label="Address">
-          <FlameTextarea
-            rows={3}
-            name="address"
-            value={formData.address || ""}
-            onChange={onChange}
-            placeholder="Street, area, city"
-          />
-        </Field>
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
       </div>
     </div>
   );
 }
-<<<<<<< HEAD
-=======
 
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
 interface RepeatableCardProps {
   children: ReactNode;
   onRemove: () => void;
@@ -586,51 +622,31 @@ function AddButton({ onClick, label }: AddButtonProps) {
 
 function ExperienceTab() {
   const [entries, setEntries] = useState<Entry[]>([{ id: 1 }]);
-
   return (
     <div>
-      <SectionHeading
-        title="Experience"
-        description="List your work history, most recent first."
-      />
+      <SectionHeading title="Experience" description="List your work history, most recent first." />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
             key={entry.id}
-            onRemove={() =>
-              setEntries((prev) => prev.filter((e) => e.id !== entry.id))
-            }
+            onRemove={() => setEntries((prev) => prev.filter((e) => e.id !== entry.id))}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Job title" required>
-                <FlameInput placeholder="Software Engineer" />
-              </Field>
-              <Field label="Company" required>
-                <FlameInput placeholder="SSGC" />
-              </Field>
-              <Field label="Start date">
-                <FlameInput type="month" />
-              </Field>
-              <Field label="End date">
-                <FlameInput type="month" />
-              </Field>
+              <Field label="Job title" required><FlameInput placeholder="Software Engineer" /></Field>
+              <Field label="Company" required><FlameInput placeholder="SSGC" /></Field>
+              <Field label="Start date"><FlameInput type="month" /></Field>
+              <Field label="End date"><FlameInput type="month" /></Field>
             </div>
             <div className="mt-5">
               <Field label="Responsibilities">
-                <FlameTextarea
-                  rows={3}
-                  placeholder="Briefly describe your role and achievements"
-                />
+                <FlameTextarea rows={3} placeholder="Briefly describe your role and achievements" />
               </Field>
             </div>
           </RepeatableCard>
         ))}
       </div>
       <div className="mt-4">
-        <AddButton
-          label="Add another position"
-          onClick={() => setEntries((prev) => [...prev, { id: Date.now() }])}
-        />
+        <AddButton label="Add another position" onClick={() => setEntries((prev) => [...prev, { id: Date.now() }])} />
       </div>
     </div>
   );
@@ -638,43 +654,26 @@ function ExperienceTab() {
 
 function EducationTab() {
   const [entries, setEntries] = useState<Entry[]>([{ id: 1 }]);
-
   return (
     <div>
-      <SectionHeading
-        title="Education"
-        description="Add your academic qualifications, most recent first."
-      />
+      <SectionHeading title="Education" description="Add your academic qualifications, most recent first." />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
             key={entry.id}
-            onRemove={() =>
-              setEntries((prev) => prev.filter((e) => e.id !== entry.id))
-            }
+            onRemove={() => setEntries((prev) => prev.filter((e) => e.id !== entry.id))}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Degree / Qualification" required>
-                <FlameInput placeholder="BS Computer Science" />
-              </Field>
-              <Field label="Institution" required>
-                <FlameInput placeholder="NED University" />
-              </Field>
-              <Field label="Year of completion">
-                <FlameInput placeholder="2024" />
-              </Field>
-              <Field label="Grade / CGPA">
-                <FlameInput placeholder="3.6 / 4.0" />
-              </Field>
+              <Field label="Degree / Qualification" required><FlameInput placeholder="BS Computer Science" /></Field>
+              <Field label="Institution" required><FlameInput placeholder="NED University" /></Field>
+              <Field label="Year of completion"><FlameInput placeholder="2024" /></Field>
+              <Field label="Grade / CGPA"><FlameInput placeholder="3.6 / 4.0" /></Field>
             </div>
           </RepeatableCard>
         ))}
       </div>
       <div className="mt-4">
-        <AddButton
-          label="Add another qualification"
-          onClick={() => setEntries((prev) => [...prev, { id: Date.now() }])}
-        />
+        <AddButton label="Add another qualification" onClick={() => setEntries((prev) => [...prev, { id: Date.now() }])} />
       </div>
     </div>
   );
@@ -682,43 +681,26 @@ function EducationTab() {
 
 function CertificatesTab() {
   const [entries, setEntries] = useState<Entry[]>([{ id: 1 }]);
-
   return (
     <div>
-      <SectionHeading
-        title="Certificates"
-        description="Professional certifications relevant to your field."
-      />
+      <SectionHeading title="Certificates" description="Professional certifications relevant to your field." />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
             key={entry.id}
-            onRemove={() =>
-              setEntries((prev) => prev.filter((e) => e.id !== entry.id))
-            }
+            onRemove={() => setEntries((prev) => prev.filter((e) => e.id !== entry.id))}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Certificate name" required>
-                <FlameInput placeholder="AWS Certified Developer" />
-              </Field>
-              <Field label="Issuing organisation">
-                <FlameInput placeholder="Amazon Web Services" />
-              </Field>
-              <Field label="Issue date">
-                <FlameInput type="month" />
-              </Field>
-              <Field label="Credential ID">
-                <FlameInput placeholder="Optional" />
-              </Field>
+              <Field label="Certificate name" required><FlameInput placeholder="AWS Certified Developer" /></Field>
+              <Field label="Issuing organisation"><FlameInput placeholder="Amazon Web Services" /></Field>
+              <Field label="Issue date"><FlameInput type="month" /></Field>
+              <Field label="Credential ID"><FlameInput placeholder="Optional" /></Field>
             </div>
           </RepeatableCard>
         ))}
       </div>
       <div className="mt-4">
-        <AddButton
-          label="Add another certificate"
-          onClick={() => setEntries((prev) => [...prev, { id: Date.now() }])}
-        />
+        <AddButton label="Add another certificate" onClick={() => setEntries((prev) => [...prev, { id: Date.now() }])} />
       </div>
     </div>
   );
@@ -726,109 +708,101 @@ function CertificatesTab() {
 
 function MembershipsTab() {
   const [entries, setEntries] = useState<Entry[]>([{ id: 1 }]);
-
   return (
     <div>
-      <SectionHeading
-        title="Memberships"
-        description="Professional bodies or associations you belong to."
-      />
+      <SectionHeading title="Memberships" description="Professional bodies or associations you belong to." />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
             key={entry.id}
-            onRemove={() =>
-              setEntries((prev) => prev.filter((e) => e.id !== entry.id))
-            }
+            onRemove={() => setEntries((prev) => prev.filter((e) => e.id !== entry.id))}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Organisation" required>
-                <FlameInput placeholder="Pakistan Engineering Council" />
-              </Field>
-              <Field label="Membership type">
-                <FlameInput placeholder="Associate Member" />
-              </Field>
-              <Field label="Member since">
-                <FlameInput type="month" />
-              </Field>
-              <Field label="Membership ID">
-                <FlameInput placeholder="Optional" />
-              </Field>
+              <Field label="Organisation" required><FlameInput placeholder="Pakistan Engineering Council" /></Field>
+              <Field label="Membership type"><FlameInput placeholder="Associate Member" /></Field>
+              <Field label="Member since"><FlameInput type="month" /></Field>
+              <Field label="Membership ID"><FlameInput placeholder="Optional" /></Field>
             </div>
           </RepeatableCard>
         ))}
       </div>
       <div className="mt-4">
-        <AddButton
-          label="Add another membership"
-          onClick={() => setEntries((prev) => [...prev, { id: Date.now() }])}
-        />
+        <AddButton label="Add another membership" onClick={() => setEntries((prev) => [...prev, { id: Date.now() }])} />
       </div>
     </div>
   );
 }
 
+// 👇 Combined shape covering photo + all PersonalTab fields
+interface ProfileFormData extends PersonalFormData {
+  image: File | string;
+}
+
+const initialFormData: ProfileFormData = {
+  image: "",
+  father_name: "",
+  marital_status: "",
+  children: "",
+  date_of_birth: "",
+  birth_country: "",
+  birth_city: "",
+  birth_city_other: "",
+  is_pakistani: "",
+  cnic: "",
+  passport_no: "",
+  domicile: "",
+  mobile_prefix: "+92",
+  mobile_number: "",
+  home_prefix: "+92",
+  home_number: "",
+  office_prefix: "+92",
+  office_number: "",
+  current_address: "",
+  permanent_address: "",
+  already_worked_ssgc: "",
+  ssgc_employee_name: "",
+  ssgc_employee_number: "",
+};
+
 export default function ProfileTabs() {
   const [activeTab, setActiveTab] = useState<TabId>("photo");
-<<<<<<< HEAD
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-=======
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
-  const [formData, setFormData] = useState<{
-    image: File | string;
-    fullName: string;
-    email: string;
-    phone: string;
-    city: string;
-    dob: string;
-    cnic: string;
-    address: string;
-  }>({
-    image: "",
-    fullName: "",
-    email: "",
-    phone: "",
-    city: "",
-    dob: "",
-    cnic: "",
-    address: "",
-  });
-
+  const [formData, setFormData] = useState<ProfileFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function validate() {
     const newErrors: Record<string, string> = {};
-<<<<<<< HEAD
 
     if (activeTab === "photo" && !(formData.image instanceof File)) {
       newErrors.image = "Image is required";
     }
 
     if (activeTab === "personal") {
-      if (!formData.fullName) newErrors.fullName = "Full name is required";
-      if (!formData.email) newErrors.email = "Email is required";
+      if (!formData.father_name) newErrors.father_name = "Father's name is required";
+      if (!formData.marital_status) newErrors.marital_status = "Marital status is required";
+      if (!formData.date_of_birth) newErrors.date_of_birth = "Date of birth is required";
+      if (!formData.birth_country) newErrors.birth_country = "Birth country is required";
+      if (!formData.birth_city) newErrors.birth_city = "Birth city is required";
+      if (formData.birth_city === "other" && !formData.birth_city_other) {
+        newErrors.birth_city_other = "Please specify your birth city";
+      }
     }
 
-=======
-    if (activeTab === "photo" && !formData.image) {
-      newErrors.image = "Image is required";
-    }
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
 
-  function handleChange(
-<<<<<<< HEAD
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-=======
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
-  ) {
+  function handleChange(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      // clear stale "other" city text if user switches away from "other"
+      if (name === "birth_city" && value !== "other") {
+        updated.birth_city_other = "";
+      }
+      return updated;
+    });
   }
 
   function handleImageChange(file: File | null) {
@@ -842,7 +816,6 @@ export default function ProfileTabs() {
     e.preventDefault();
     if (!validate()) return;
 
-<<<<<<< HEAD
     setSaving(true);
     setSubmitError(null);
 
@@ -854,28 +827,23 @@ export default function ProfileTabs() {
             return;
           }
           const photoPayload = new FormData();
-          photoPayload.append("photo", formData.image);
-          await axios.post("/api/profile/photo", photoPayload, {
-            headers: { "Content-Type": "multipart/form-data" },
+          photoPayload.append("pic", formData.image);
+          await axios.post("/api/profile", photoPayload, {
+            withCredentials: true,
+            // don't set Content-Type manually — axios sets the multipart boundary automatically
           });
           break;
         }
 
         case "personal": {
-          await axios.patch("/api/profile", {
-            fullName: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            city: formData.city,
-            dob: formData.dob,
-            cnic: formData.cnic,
-            address: formData.address,
+          const { image, ...personalData } = formData; // strip image, not relevant here
+          await axios.patch("/api/profile", personalData, {
+            withCredentials: true,
           });
           break;
         }
 
         default:
-          // Other tabs (experience, education, etc.) handle their own save/add actions separately
           break;
       }
 
@@ -885,39 +853,18 @@ export default function ProfileTabs() {
       setSubmitError("Something went wrong while saving");
     } finally {
       setSaving(false);
-=======
-    try {
-      const payload = new FormData();
-      Object.entries(formData).forEach(([key, val]) => {
-        payload.append(key, val);
-      });
-
-      await axios.post("/api/user_profile", payload, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      alert("Profile updated successfully!");
-    } catch (err) {
-      console.error("Submission failed", err);
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
     }
   }
 
   return (
-    <div
-      className="min-h-screen py-10 px-4"
-      style={{ background: flame.paper }}
-    >
+    <div className="min-h-screen py-10 px-4" style={{ background: flame.paper }}>
       <div className="max-w-7xl mx-auto">
         <div className="mb-6 flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
             style={{ background: flameGradient }}
           >
-            <Flame
-              className="w-5 h-5 text-white"
-              fill="white"
-              fillOpacity={0.25}
-            />
+            <Flame className="w-5 h-5 text-white" fill="white" fillOpacity={0.25} />
           </div>
           <div>
             <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
@@ -931,22 +878,12 @@ export default function ProfileTabs() {
 
         <div
           className="bg-white rounded-xl overflow-hidden"
-          style={{
-            border: "1px solid #E7E5E1",
-            boxShadow: "0 1px 2px rgba(11,31,51,0.04)",
-          }}
+          style={{ border: "1px solid #E7E5E1", boxShadow: "0 1px 2px rgba(11,31,51,0.04)" }}
         >
           <div className="h-1" style={{ background: flameGradient }} />
 
-          <div
-            className="border-b overflow-x-auto"
-            style={{ borderColor: "#E7E5E1" }}
-          >
-            <nav
-              className="flex min-w-max gap-1 px-2"
-              role="tablist"
-              aria-label="Profile sections"
-            >
+          <div className="border-b overflow-x-auto" style={{ borderColor: "#E7E5E1" }}>
+            <nav className="flex min-w-max gap-1 px-2" role="tablist" aria-label="Profile sections">
               {TABS.map((tab, index) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
@@ -961,10 +898,7 @@ export default function ProfileTabs() {
                       color: isActive ? flame.core : "#334155",
                       fontWeight: isActive ? 700 : 600,
                       background: isActive ? "#F8FAFC" : "transparent",
-                      borderRight:
-                        index !== TABS.length - 1
-                          ? "1px solid #E2E8F0"
-                          : "none",
+                      borderRight: index !== TABS.length - 1 ? "1px solid #E2E8F0" : "none",
                     }}
                   >
                     <Icon className="w-4 h-4" />
@@ -984,27 +918,13 @@ export default function ProfileTabs() {
           <div className="p-6 sm:p-8">
             {activeTab === "photo" && (
               <PhotoTab
-<<<<<<< HEAD
                 image={typeof formData.image === "string" ? formData.image : ""}
-=======
-                image={
-                  typeof formData.image === "string" ? formData.image : ""
-                }
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
                 onChange={handleImageChange}
                 error={errors.image}
               />
             )}
             {activeTab === "personal" && (
-<<<<<<< HEAD
-              <PersonalTab
-                formData={formData}
-                onChange={handleChange}
-                errors={errors}
-              />
-=======
-              <PersonalTab formData={formData} onChange={handleChange} />
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
+              <PersonalTab formData={formData} onChange={handleChange} errors={errors} />
             )}
             {activeTab === "experience" && <ExperienceTab />}
             {activeTab === "education" && <EducationTab />}
@@ -1013,14 +933,11 @@ export default function ProfileTabs() {
           </div>
 
           <div
-<<<<<<< HEAD
             className="flex items-center justify-between gap-3 border-t px-6 sm:px-8 py-4"
             style={{ borderColor: "#E7E5E1", background: "#FBFBFA" }}
           >
             <div>
-              {submitError && (
-                <p className="text-sm font-medium text-rose-600">{submitError}</p>
-              )}
+              {submitError && <p className="text-sm font-medium text-rose-600">{submitError}</p>}
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -1039,25 +956,6 @@ export default function ProfileTabs() {
                 {saving ? "Saving..." : "Save changes"}
               </button>
             </div>
-=======
-            className="flex items-center justify-end gap-3 border-t px-6 sm:px-8 py-4"
-            style={{ borderColor: "#E7E5E1", background: "#FBFBFA" }}
-          >
-            <button
-              type="button"
-              className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-              style={{ background: flameGradient }}
-              onClick={handleSubmit}
-            >
-              Save changes
-            </button>
->>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
           </div>
         </div>
       </div>
