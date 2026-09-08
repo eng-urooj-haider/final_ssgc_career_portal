@@ -13,6 +13,7 @@ datasource db {
 }
 
 model User {
+<<<<<<< HEAD
   id       Int     @id @default(autoincrement())
   email    String  @unique
   password String  @db.Text
@@ -89,3 +90,33 @@ model countries {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
+=======
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  password  String @db.Text
+  role  String?
+}
+model Job {
+  id                Int      @id @default(autoincrement())
+  job_code          String   @unique
+  title             String
+  city              Json 
+  publication_date  DateTime
+  deadline          DateTime
+  age               Int?
+  qualification     String   @db.Text
+  skill             String?  @db.Text
+  responsibility    String?  @db.Text
+  special_info      String?  @db.Text
+  doc1_title        String?
+  doc1_attachment   String?
+  doc2_title        String?
+  doc2_attachment   String?
+  req1_doc_title    String?
+  req2_doc_title    String?
+  job_type          String
+  email             String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+}
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991

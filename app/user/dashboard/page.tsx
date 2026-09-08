@@ -1,11 +1,15 @@
 "use client";
 
+<<<<<<< HEAD
 import React, {
   useState,
   useRef,
   type ReactNode,
   type ChangeEvent,
 } from "react";
+=======
+import React, { useState, useRef, type ReactNode, type ChangeEvent } from "react";
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
 import {
   User,
   Briefcase,
@@ -211,6 +215,7 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
   );
 }
 
+<<<<<<< HEAD
 interface PersonalTabProps {
   formData: Record<string, string>;
   onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
@@ -218,6 +223,15 @@ interface PersonalTabProps {
 }
 
 function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
+=======
+function PersonalTab({
+  formData,
+  onChange,
+}: {
+  formData: Record<string, string>;
+  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+}) {
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
   return (
     <div>
       <SectionHeading
@@ -225,6 +239,7 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
         description="This information is used across your applications."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+<<<<<<< HEAD
         
         {/* Full Name */}
         <Field label="Full Name" required error={errors.full_name}>
@@ -300,10 +315,42 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
           <FlameInput
             name="birth_city"
             value={formData.birth_city || ""}
+=======
+        <Field label="Full name" required>
+          <FlameInput
+            name="fullName"
+            value={formData.fullName || ""}
+            onChange={onChange}
+            placeholder="e.g. Urooj Fatima"
+          />
+        </Field>
+        <Field label="Email address" required>
+          <FlameInput
+            type="email"
+            name="email"
+            value={formData.email || ""}
+            onChange={onChange}
+            placeholder="you@example.com"
+          />
+        </Field>
+        <Field label="Phone number">
+          <FlameInput
+            name="phone"
+            value={formData.phone || ""}
+            onChange={onChange}
+            placeholder="+92 300 0000000"
+          />
+        </Field>
+        <Field label="City">
+          <FlameInput
+            name="city"
+            value={formData.city || ""}
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
             onChange={onChange}
             placeholder="Karachi"
           />
         </Field>
+<<<<<<< HEAD
 
         {/* Birth City Other (Conditionally shown or optional) */}
         <Field label="Birth City (Other)" error={errors.birth_city_other}>
@@ -331,11 +378,23 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
 
         {/* CNIC */}
         <Field label="CNIC" error={errors.cnic}>
+=======
+        <Field label="Date of birth">
+          <FlameInput
+            type="date"
+            name="dob"
+            value={formData.dob || ""}
+            onChange={onChange}
+          />
+        </Field>
+        <Field label="CNIC / National ID">
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
           <FlameInput
             name="cnic"
             value={formData.cnic || ""}
             onChange={onChange}
             placeholder="00000-0000000-0"
+<<<<<<< HEAD
             maxLength={15}
           />
         </Field>
@@ -456,10 +515,29 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
             </Field>
           </>
         )}
+=======
+          />
+        </Field>
+      </div>
+      <div className="mt-5">
+        <Field label="Address">
+          <FlameTextarea
+            rows={3}
+            name="address"
+            value={formData.address || ""}
+            onChange={onChange}
+            placeholder="Street, area, city"
+          />
+        </Field>
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
       </div>
     </div>
   );
 }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
 interface RepeatableCardProps {
   children: ReactNode;
   onRemove: () => void;
@@ -692,9 +770,12 @@ function MembershipsTab() {
 
 export default function ProfileTabs() {
   const [activeTab, setActiveTab] = useState<TabId>("photo");
+<<<<<<< HEAD
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+=======
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
   const [formData, setFormData] = useState<{
     image: File | string;
     fullName: string;
@@ -719,6 +800,7 @@ export default function ProfileTabs() {
 
   function validate() {
     const newErrors: Record<string, string> = {};
+<<<<<<< HEAD
 
     if (activeTab === "photo" && !(formData.image instanceof File)) {
       newErrors.image = "Image is required";
@@ -729,12 +811,21 @@ export default function ProfileTabs() {
       if (!formData.email) newErrors.email = "Email is required";
     }
 
+=======
+    if (activeTab === "photo" && !formData.image) {
+      newErrors.image = "Image is required";
+    }
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
 
   function handleChange(
+<<<<<<< HEAD
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+=======
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
   ) {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -751,6 +842,7 @@ export default function ProfileTabs() {
     e.preventDefault();
     if (!validate()) return;
 
+<<<<<<< HEAD
     setSaving(true);
     setSubmitError(null);
 
@@ -793,6 +885,20 @@ export default function ProfileTabs() {
       setSubmitError("Something went wrong while saving");
     } finally {
       setSaving(false);
+=======
+    try {
+      const payload = new FormData();
+      Object.entries(formData).forEach(([key, val]) => {
+        payload.append(key, val);
+      });
+
+      await axios.post("/api/user_profile", payload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      alert("Profile updated successfully!");
+    } catch (err) {
+      console.error("Submission failed", err);
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
     }
   }
 
@@ -878,17 +984,27 @@ export default function ProfileTabs() {
           <div className="p-6 sm:p-8">
             {activeTab === "photo" && (
               <PhotoTab
+<<<<<<< HEAD
                 image={typeof formData.image === "string" ? formData.image : ""}
+=======
+                image={
+                  typeof formData.image === "string" ? formData.image : ""
+                }
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
                 onChange={handleImageChange}
                 error={errors.image}
               />
             )}
             {activeTab === "personal" && (
+<<<<<<< HEAD
               <PersonalTab
                 formData={formData}
                 onChange={handleChange}
                 errors={errors}
               />
+=======
+              <PersonalTab formData={formData} onChange={handleChange} />
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
             )}
             {activeTab === "experience" && <ExperienceTab />}
             {activeTab === "education" && <EducationTab />}
@@ -897,6 +1013,7 @@ export default function ProfileTabs() {
           </div>
 
           <div
+<<<<<<< HEAD
             className="flex items-center justify-between gap-3 border-t px-6 sm:px-8 py-4"
             style={{ borderColor: "#E7E5E1", background: "#FBFBFA" }}
           >
@@ -922,6 +1039,25 @@ export default function ProfileTabs() {
                 {saving ? "Saving..." : "Save changes"}
               </button>
             </div>
+=======
+            className="flex items-center justify-end gap-3 border-t px-6 sm:px-8 py-4"
+            style={{ borderColor: "#E7E5E1", background: "#FBFBFA" }}
+          >
+            <button
+              type="button"
+              className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              style={{ background: flameGradient }}
+              onClick={handleSubmit}
+            >
+              Save changes
+            </button>
+>>>>>>> 7bfb65fcc388409c0c5e1bc91cb1e7f9091fc991
           </div>
         </div>
       </div>
