@@ -1,0 +1,91 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id       Int     @id @default(autoincrement())
+  email    String  @unique
+  password String  @db.Text
+  role     String?
+}
+
+model Job {
+  id               Int      @id @default(autoincrement())
+  job_code         String   @unique
+  title            String
+  city             Json
+  publication_date DateTime
+  deadline         DateTime
+  age              Int?
+  qualification    String   @db.Text
+  skill            String?  @db.Text
+  responsibility   String?  @db.Text
+  special_info     String?  @db.Text
+  doc1_title       String?
+  doc1_attachment  String?
+  doc2_title       String?
+  doc2_attachment  String?
+  req1_doc_title   String?
+  req2_doc_title   String?
+  job_type         String
+  email            String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+}
+
+model profile {
+  id                   Int       @id @default(autoincrement())
+  user_id              Int       @unique
+  first_name           String?
+  last_name            String?
+  gender               String?
+  father_name          String?   @db.VarChar(100)
+  marital_status       String?   @db.VarChar(10)
+  children             String?   @db.VarChar(2)
+  date_of_birth        DateTime?
+  birth_country        String?
+  birth_city           String?
+  birth_city_other     String?
+  is_pakistani         String?   @db.VarChar(3)
+  cnic                 String?   @db.VarChar(15)
+  passport_no          String?   @db.VarChar(15)
+  domicile             String?   @db.VarChar(20)
+  mobile_prefix        String?   @db.VarChar(10)
+  mobile_number        String?   @db.VarChar(10)
+  home_prefix          String?   @db.VarChar(10)
+  home_number          String?   @db.VarChar(10)
+  office_prefix        String?   @db.VarChar(10)
+  office_number        String?   @db.VarChar(10)
+  current_address      String?   @db.TinyText
+  permanent_address    String?   @db.TinyText
+  already_worked_ssgc  String?   @db.VarChar(3)
+  ssgc_employee_name   String?   @db.VarChar(100)
+  ssgc_employee_number String?   @db.VarChar(10)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+}
+
+model cities {
+  id         Int      @id @default(autoincrement())
+  cities     String
+  provience  String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model countries {
+  id         Int      @id @default(autoincrement())
+  country     String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
