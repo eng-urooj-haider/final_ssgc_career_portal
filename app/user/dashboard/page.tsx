@@ -197,10 +197,10 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
     }
   }
 
-  const fetchUserProfile = async () => {
-    const res = await axios.get("/api/user_profile", { withCredentials: true });
-    return res.data.profile;
-  };
+  // const fetchUserProfile = async () => {
+  //   const res = await axios.get("/api/user_profile", { withCredentials: true });
+  //   return res.data.profile;
+  // };
 
   const {
     data: profile,

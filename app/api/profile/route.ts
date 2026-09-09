@@ -104,10 +104,15 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
 
     // Update if a profile already exists for this user, otherwise create one.
+    const data = { ...body };
+    if (data.date_of_birth) {
+      data.date_of_birth = new Date(data.date_of_birth);
+    }
+
     const profile = await prisma.profile.upsert({
       where: { user_id: userId },
-      update: body,
-      create: { user_id: userId, ...body },
+      update: data,
+      create: { user_id: userId, ...data },
     });
 
     return NextResponse.json({ profile }, { status: 200 });
