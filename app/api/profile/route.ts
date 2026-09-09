@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: "Invalid or expired token" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -62,7 +62,11 @@ export async function POST(req: NextRequest) {
 
     // 4. Only now delete the OLD file, after DB update succeeded
     if (existingProfile?.user_pic) {
-      const oldFilePath = path.join(process.cwd(), "public", existingProfile.user_pic);
+      const oldFilePath = path.join(
+        process.cwd(),
+        "public",
+        existingProfile.user_pic,
+      );
       await unlink(oldFilePath).catch((err) => {
         console.warn("Could not delete old profile user_picture:", err.message);
       });
@@ -73,7 +77,45 @@ export async function POST(req: NextRequest) {
     console.error("Upload error:", error);
     return NextResponse.json(
       { error: "Something went wrong while uploading" },
-      { status: 500 }
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const token = req.cookies.get("token")?.value;
+
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let userId: number;
+  try {
+    const decoded = verifyToken(token);
+    userId = decoded.userId;
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid or expired token" },
+      { status: 401 },
+    );
+  }
+
+  try {
+    const body = await req.json();
+
+    // Update if a profile already exists for this user, otherwise create one.
+    const profile = await prisma.profile.upsert({
+      where: { user_id: userId },
+      update: body,
+      create: { user_id: userId, ...body },
+    });
+
+    return NextResponse.json({ profile }, { status: 200 });
+  } catch (err) {
+    console.error("Profile PATCH failed", err);
+    return NextResponse.json(
+      { error: "Something went wrong while saving the profile" },
+      { status: 500 },
     );
   }
 }

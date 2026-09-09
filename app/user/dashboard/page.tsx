@@ -62,10 +62,16 @@ const TABS: TabDef[] = [
 // ---------------------------------------------------------------------------
 
 const NAME_REGEX = /^[A-Za-z\s.'-]+$/;
-const CNIC_REGEX = /^\d{5}-\d{7}-\d{1}$/;
-const PREFIX_REGEX = /^\+\d{1,4}$/;
-const MOBILE_REGEX = /^\d{10}$/;
-const LANDLINE_REGEX = /^\d{6,10}$/;
+const CNIC_REGEX = /^\d{13}$/;
+// Local Pakistani dialing code, e.g. "021" (landline) or "0300" (mobile network).
+// NOTE: previously this required a leading "+" (e.g. "+92"), which could never
+// match the "03xx" placeholder or the 4-character maxLength on the input.
+const PREFIX_REGEX = /^0\d{2,3}$/;
+// 7-digit subscriber number that follows the mobile prefix (e.g. 0300-1234567).
+// Previously this required exactly 10 digits while the input was capped at
+// maxLength=7, so the field could never be filled in a way that validated.
+const MOBILE_REGEX = /^\d{7}$/;
+const LANDLINE_REGEX = /^\d{6,8}$/;
 const YEAR_REGEX = /^(19|20)\d{2}$/;
 
 function calculateAge(dobString: string): number {
@@ -196,7 +202,11 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
     return res.data.profile;
   };
 
-  const { data: profile } = useQuery({
+  const {
+    data: profile,
+    isLoading: isLoadingProfile,
+    isError: isProfileError,
+  } = useQuery({
     queryKey: ["profile_pic"],
     queryFn: fetchUserProfile,
   });
@@ -256,10 +266,21 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
               accept="image/*"
               onChange={handleFile}
               className="hidden"
+              aria-label="Upload profile photo"
             />
             <p className="mt-2 text-xs text-slate-500">
               JPG or PNG. Square image, at least 400×400px.
             </p>
+            {isLoadingProfile && !hasLocalSelection && (
+              <p className="mt-1 text-xs text-slate-400">
+                Loading current photo…
+              </p>
+            )}
+            {isProfileError && !hasLocalSelection && (
+              <p className="mt-1 text-xs text-red-400">
+                Couldn't load your current photo.
+              </p>
+            )}
           </div>
         </div>
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
@@ -329,13 +350,17 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
         description="This information is used across your applications."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <Field label="Father / Husband's Name" required error={errors.father_name}>
+        <Field
+          label="Father / Husband's Name"
+          required
+          error={errors.father_name}
+        >
           <FlameInput
             name="father_name"
             value={formData.father_name || ""}
             onChange={onChange}
             placeholder="Father's full name"
-            maxLength={100}
+            maxLength={60}
           />
         </Field>
 
@@ -390,7 +415,9 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
             <option value="">
               {isLoadingCountries ? "Loading countries..." : "Select country"}
             </option>
-            {countriesError && <option disabled>Failed to load countries</option>}
+            {countriesError && (
+              <option disabled>Failed to load countries</option>
+            )}
             {countries?.map((country: { id: number; country: string }) => (
               <option key={country.id} value={country.country}>
                 {country.country}
@@ -421,7 +448,11 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
         </Field>
 
         {formData.birth_city === "other" && (
-          <Field label="Birth City (Other)" required error={errors.birth_city_other}>
+          <Field
+            label="Birth City (Other)"
+            required
+            error={errors.birth_city_other}
+          >
             <FlameInput
               name="birth_city_other"
               value={formData.birth_city_other || ""}
@@ -444,21 +475,23 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
           </select>
         </Field>
 
+        {/* Only one of CNIC / Passport applies, depending on citizenship. */}
         {formData.is_pakistani === "Yes" && (
           <Field label="CNIC" required error={errors.cnic}>
             <FlameInput
               name="cnic"
               value={formData.cnic || ""}
               onChange={onChange}
-              placeholder="00000-0000000-0"
-              maxLength={15}
+              placeholder="0000000000000"
+              maxLength={13}
+              type="tel"
+              inputMode="numeric"
             />
           </Field>
         )}
 
         {formData.is_pakistani === "No" && (
-          // Passport Number is intentionally left unvalidated and not required.
-          <Field label="Passport Number">
+          <Field label="Passport Number" required error={errors.passport_no}>
             <FlameInput
               name="passport_no"
               value={formData.passport_no || ""}
@@ -469,7 +502,7 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
           </Field>
         )}
 
-        <Field label="Domicile" error={errors.domicile}>
+        <Field label="Province of Domicile" required error={errors.domicile}>
           <FlameInput
             name="domicile"
             value={formData.domicile || ""}
@@ -481,63 +514,102 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
 
         {/* Mobile Number Group */}
         <div className="flex gap-2">
-          <Field label="Code" className="w-1/3" required error={errors.mobile_prefix}>
+          <Field
+            label="Code"
+            className="w-1/3"
+            required
+            error={errors.mobile_prefix}
+          >
             <FlameInput
               name="mobile_prefix"
-              value={formData.mobile_prefix || "+92"}
+              value={formData.mobile_prefix}
               onChange={onChange}
-              maxLength={10}
+              maxLength={4}
+              placeholder="03xx"
+              type="tel"
+              inputMode="numeric"
             />
           </Field>
-          <Field label="Mobile Number" className="w-2/3" required error={errors.mobile_number}>
+          <Field
+            label="Mobile Number"
+            className="w-2/3"
+            required
+            error={errors.mobile_number}
+          >
             <FlameInput
               name="mobile_number"
               value={formData.mobile_number || ""}
               onChange={onChange}
-              placeholder="3000000000"
-              maxLength={10}
+              placeholder="xxxxxxx"
+              maxLength={7}
+              type="tel"
+              inputMode="numeric"
             />
           </Field>
         </div>
 
-        {/* Home Number Group */}
+        {/* Home Number Group (optional) */}
         <div className="flex gap-2">
           <Field label="Code" className="w-1/3" error={errors.home_prefix}>
             <FlameInput
               name="home_prefix"
-              value={formData.home_prefix || "+92"}
+              value={formData.home_prefix}
               onChange={onChange}
-              maxLength={10}
+              maxLength={4}
+              placeholder="021"
+              type="tel"
+              inputMode="numeric"
             />
           </Field>
-          <Field label="Home Phone" className="w-2/3" error={errors.home_number}>
+          <Field
+            label="Home Phone"
+            className="w-2/3"
+            error={errors.home_number}
+          >
             <FlameInput
               name="home_number"
               value={formData.home_number || ""}
               onChange={onChange}
-              placeholder="3000000000"
-              maxLength={10}
+              placeholder="xxxxxxx"
+              maxLength={8}
+              type="tel"
+              inputMode="numeric"
             />
           </Field>
         </div>
 
         {/* Office Number Group */}
         <div className="flex gap-2">
-          <Field label="Code" className="w-1/3" required error={errors.office_prefix}>
+          <Field
+            label="Code"
+            className="w-1/3"
+            required
+            error={errors.office_prefix}
+          >
             <FlameInput
               name="office_prefix"
-              value={formData.office_prefix || "+92"}
+              value={formData.office_prefix}
               onChange={onChange}
-              maxLength={10}
+              placeholder="021"
+              maxLength={4}
+              type="tel"
+              inputMode="numeric"
             />
           </Field>
-          <Field label="Office Phone" className="w-2/3" required error={errors.office_number}>
+          <Field
+            label="Office Phone"
+            className="w-2/3"
+            required
+            error={errors.office_number}
+          >
             <FlameInput
               name="office_number"
               value={formData.office_number || ""}
               onChange={onChange}
-              placeholder="3000000000"
-              maxLength={10}
+              placeholder="xxxxxxx"
+              maxLength={8}
+              type="tel"
+              inputMode="numeric"
             />
           </Field>
         </div>
@@ -551,28 +623,36 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
             value={formData.current_address || ""}
             onChange={onChange}
             placeholder="Street, area, city"
-            maxLength={200}
+            maxLength={150}
           />
         </Field>
-        <Field label="Permanent Address" error={errors.permanent_address}>
+        <Field
+          label="Permanent Address"
+          required
+          error={errors.permanent_address}
+        >
           <FlameTextarea
             rows={3}
             name="permanent_address"
             value={formData.permanent_address || ""}
             onChange={onChange}
             placeholder="Street, area, city"
-            maxLength={200}
+            maxLength={150}
           />
         </Field>
       </div>
 
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <Field label="Already worked at SSGC?" required error={errors.already_worked_ssgc}>
+        <Field
+          label="Already worked at SSGC?"
+          required
+          error={errors.already_worked_ssgc}
+        >
           <select
             name="already_worked_ssgc"
             value={formData.already_worked_ssgc || ""}
             onChange={onChange}
-            className="w-full rounded-md border border-gray-300 p-2 text-sm"
+            className="w-full rounded-md border border-gray-300 p-2 text-sm text-black"
           >
             <option value="">Select</option>
             <option value="Yes">Yes</option>
@@ -582,22 +662,32 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
 
         {formData.already_worked_ssgc === "Yes" && (
           <>
-            <Field label="SSGC Employee Name" required error={errors.ssgc_employee_name}>
+            <Field
+              label="SSGC Employee Name"
+              required
+              error={errors.ssgc_employee_name}
+            >
               <FlameInput
                 name="ssgc_employee_name"
                 value={formData.ssgc_employee_name || ""}
                 onChange={onChange}
                 placeholder="Employee Name"
-                maxLength={100}
+                maxLength={60}
               />
             </Field>
-            <Field label="SSGC Employee Number" required error={errors.ssgc_employee_number}>
+            <Field
+              label="SSGC Employee Number"
+              required
+              error={errors.ssgc_employee_number}
+            >
               <FlameInput
                 name="ssgc_employee_number"
                 value={formData.ssgc_employee_number || ""}
                 onChange={onChange}
                 placeholder="Employee Number"
                 maxLength={10}
+                type="tel"
+                inputMode="numeric"
               />
             </Field>
           </>
@@ -617,7 +707,11 @@ interface RepeatableCardProps {
   removeDisabled?: boolean;
 }
 
-function RepeatableCard({ children, onRemove, removeDisabled }: RepeatableCardProps) {
+function RepeatableCard({
+  children,
+  onRemove,
+  removeDisabled,
+}: RepeatableCardProps) {
   return (
     <div
       className="relative rounded-lg p-5"
@@ -684,16 +778,29 @@ const emptyExperience = (id: number): ExperienceEntry => ({
 
 interface ExperienceTabProps {
   entries: ExperienceEntry[];
-  onFieldChange: (id: number, field: keyof ExperienceEntry, value: string) => void;
+  onFieldChange: (
+    id: number,
+    field: keyof ExperienceEntry,
+    value: string,
+  ) => void;
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
 }
 
-function ExperienceTab({ entries, onFieldChange, onAdd, onRemove, errors }: ExperienceTabProps) {
+function ExperienceTab({
+  entries,
+  onFieldChange,
+  onAdd,
+  onRemove,
+  errors,
+}: ExperienceTabProps) {
   return (
     <div>
-      <SectionHeading title="Experience" description="List your work history, most recent first." />
+      <SectionHeading
+        title="Experience"
+        description="List your work history, most recent first."
+      />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
@@ -702,41 +809,66 @@ function ExperienceTab({ entries, onFieldChange, onAdd, onRemove, errors }: Expe
             removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Job title" required error={errors[`${entry.id}_job_title`]}>
+              <Field
+                label="Job title"
+                required
+                error={errors[`${entry.id}_job_title`]}
+              >
                 <FlameInput
                   value={entry.job_title}
-                  onChange={(e) => onFieldChange(entry.id, "job_title", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "job_title", e.target.value)
+                  }
                   placeholder="Software Engineer"
                 />
               </Field>
-              <Field label="Company" required error={errors[`${entry.id}_company`]}>
+              <Field
+                label="Company"
+                required
+                error={errors[`${entry.id}_company`]}
+              >
                 <FlameInput
                   value={entry.company}
-                  onChange={(e) => onFieldChange(entry.id, "company", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "company", e.target.value)
+                  }
                   placeholder="SSGC"
                 />
               </Field>
-              <Field label="Start date" required error={errors[`${entry.id}_start_date`]}>
+              <Field
+                label="Start date"
+                required
+                error={errors[`${entry.id}_start_date`]}
+              >
                 <FlameInput
                   type="month"
                   value={entry.start_date}
-                  onChange={(e) => onFieldChange(entry.id, "start_date", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "start_date", e.target.value)
+                  }
                 />
               </Field>
               <Field label="End date" error={errors[`${entry.id}_end_date`]}>
                 <FlameInput
                   type="month"
                   value={entry.end_date}
-                  onChange={(e) => onFieldChange(entry.id, "end_date", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "end_date", e.target.value)
+                  }
                 />
               </Field>
             </div>
             <div className="mt-5">
-              <Field label="Responsibilities" error={errors[`${entry.id}_responsibilities`]}>
+              <Field
+                label="Responsibilities"
+                error={errors[`${entry.id}_responsibilities`]}
+              >
                 <FlameTextarea
                   rows={3}
                   value={entry.responsibilities}
-                  onChange={(e) => onFieldChange(entry.id, "responsibilities", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "responsibilities", e.target.value)
+                  }
                   placeholder="Briefly describe your role and achievements"
                 />
               </Field>
@@ -773,16 +905,29 @@ const emptyEducation = (id: number): EducationEntry => ({
 
 interface EducationTabProps {
   entries: EducationEntry[];
-  onFieldChange: (id: number, field: keyof EducationEntry, value: string) => void;
+  onFieldChange: (
+    id: number,
+    field: keyof EducationEntry,
+    value: string,
+  ) => void;
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
 }
 
-function EducationTab({ entries, onFieldChange, onAdd, onRemove, errors }: EducationTabProps) {
+function EducationTab({
+  entries,
+  onFieldChange,
+  onAdd,
+  onRemove,
+  errors,
+}: EducationTabProps) {
   return (
     <div>
-      <SectionHeading title="Education" description="Add your academic qualifications, most recent first." />
+      <SectionHeading
+        title="Education"
+        description="Add your academic qualifications, most recent first."
+      />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
@@ -791,24 +936,42 @@ function EducationTab({ entries, onFieldChange, onAdd, onRemove, errors }: Educa
             removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Degree / Qualification" required error={errors[`${entry.id}_degree`]}>
+              <Field
+                label="Degree / Qualification"
+                required
+                error={errors[`${entry.id}_degree`]}
+              >
                 <FlameInput
                   value={entry.degree}
-                  onChange={(e) => onFieldChange(entry.id, "degree", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "degree", e.target.value)
+                  }
                   placeholder="BS Computer Science"
                 />
               </Field>
-              <Field label="Institution" required error={errors[`${entry.id}_institution`]}>
+              <Field
+                label="Institution"
+                required
+                error={errors[`${entry.id}_institution`]}
+              >
                 <FlameInput
                   value={entry.institution}
-                  onChange={(e) => onFieldChange(entry.id, "institution", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "institution", e.target.value)
+                  }
                   placeholder="NED University"
                 />
               </Field>
-              <Field label="Year of completion" required error={errors[`${entry.id}_year`]}>
+              <Field
+                label="Year of completion"
+                required
+                error={errors[`${entry.id}_year`]}
+              >
                 <FlameInput
                   value={entry.year}
-                  onChange={(e) => onFieldChange(entry.id, "year", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "year", e.target.value)
+                  }
                   placeholder="2024"
                   maxLength={4}
                 />
@@ -816,7 +979,9 @@ function EducationTab({ entries, onFieldChange, onAdd, onRemove, errors }: Educa
               <Field label="Grade / CGPA" error={errors[`${entry.id}_grade`]}>
                 <FlameInput
                   value={entry.grade}
-                  onChange={(e) => onFieldChange(entry.id, "grade", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "grade", e.target.value)
+                  }
                   placeholder="3.6 / 4.0"
                 />
               </Field>
@@ -853,16 +1018,29 @@ const emptyCertificate = (id: number): CertificateEntry => ({
 
 interface CertificatesTabProps {
   entries: CertificateEntry[];
-  onFieldChange: (id: number, field: keyof CertificateEntry, value: string) => void;
+  onFieldChange: (
+    id: number,
+    field: keyof CertificateEntry,
+    value: string,
+  ) => void;
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
 }
 
-function CertificatesTab({ entries, onFieldChange, onAdd, onRemove, errors }: CertificatesTabProps) {
+function CertificatesTab({
+  entries,
+  onFieldChange,
+  onAdd,
+  onRemove,
+  errors,
+}: CertificatesTabProps) {
   return (
     <div>
-      <SectionHeading title="Certificates" description="Professional certifications relevant to your field." />
+      <SectionHeading
+        title="Certificates"
+        description="Professional certifications relevant to your field."
+      />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
@@ -871,31 +1049,54 @@ function CertificatesTab({ entries, onFieldChange, onAdd, onRemove, errors }: Ce
             removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Certificate name" required error={errors[`${entry.id}_name`]}>
+              <Field
+                label="Certificate name"
+                required
+                error={errors[`${entry.id}_name`]}
+              >
                 <FlameInput
                   value={entry.name}
-                  onChange={(e) => onFieldChange(entry.id, "name", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "name", e.target.value)
+                  }
                   placeholder="AWS Certified Developer"
                 />
               </Field>
-              <Field label="Issuing organisation" required error={errors[`${entry.id}_organisation`]}>
+              <Field
+                label="Issuing organisation"
+                required
+                error={errors[`${entry.id}_organisation`]}
+              >
                 <FlameInput
                   value={entry.organisation}
-                  onChange={(e) => onFieldChange(entry.id, "organisation", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "organisation", e.target.value)
+                  }
                   placeholder="Amazon Web Services"
                 />
               </Field>
-              <Field label="Issue date" required error={errors[`${entry.id}_issue_date`]}>
+              <Field
+                label="Issue date"
+                required
+                error={errors[`${entry.id}_issue_date`]}
+              >
                 <FlameInput
                   type="month"
                   value={entry.issue_date}
-                  onChange={(e) => onFieldChange(entry.id, "issue_date", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "issue_date", e.target.value)
+                  }
                 />
               </Field>
-              <Field label="Credential ID" error={errors[`${entry.id}_credential_id`]}>
+              <Field
+                label="Credential ID"
+                error={errors[`${entry.id}_credential_id`]}
+              >
                 <FlameInput
                   value={entry.credential_id}
-                  onChange={(e) => onFieldChange(entry.id, "credential_id", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "credential_id", e.target.value)
+                  }
                   placeholder="Optional"
                 />
               </Field>
@@ -932,16 +1133,29 @@ const emptyMembership = (id: number): MembershipEntry => ({
 
 interface MembershipsTabProps {
   entries: MembershipEntry[];
-  onFieldChange: (id: number, field: keyof MembershipEntry, value: string) => void;
+  onFieldChange: (
+    id: number,
+    field: keyof MembershipEntry,
+    value: string,
+  ) => void;
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
 }
 
-function MembershipsTab({ entries, onFieldChange, onAdd, onRemove, errors }: MembershipsTabProps) {
+function MembershipsTab({
+  entries,
+  onFieldChange,
+  onAdd,
+  onRemove,
+  errors,
+}: MembershipsTabProps) {
   return (
     <div>
-      <SectionHeading title="Memberships" description="Professional bodies or associations you belong to." />
+      <SectionHeading
+        title="Memberships"
+        description="Professional bodies or associations you belong to."
+      />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
@@ -950,31 +1164,52 @@ function MembershipsTab({ entries, onFieldChange, onAdd, onRemove, errors }: Mem
             removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Organisation" required error={errors[`${entry.id}_organisation`]}>
+              <Field
+                label="Organisation"
+                required
+                error={errors[`${entry.id}_organisation`]}
+              >
                 <FlameInput
                   value={entry.organisation}
-                  onChange={(e) => onFieldChange(entry.id, "organisation", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "organisation", e.target.value)
+                  }
                   placeholder="Pakistan Engineering Council"
                 />
               </Field>
-              <Field label="Membership type" error={errors[`${entry.id}_membership_type`]}>
+              <Field
+                label="Membership type"
+                error={errors[`${entry.id}_membership_type`]}
+              >
                 <FlameInput
                   value={entry.membership_type}
-                  onChange={(e) => onFieldChange(entry.id, "membership_type", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "membership_type", e.target.value)
+                  }
                   placeholder="Associate Member"
                 />
               </Field>
-              <Field label="Member since" error={errors[`${entry.id}_member_since`]}>
+              <Field
+                label="Member since"
+                error={errors[`${entry.id}_member_since`]}
+              >
                 <FlameInput
                   type="month"
                   value={entry.member_since}
-                  onChange={(e) => onFieldChange(entry.id, "member_since", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "member_since", e.target.value)
+                  }
                 />
               </Field>
-              <Field label="Membership ID" error={errors[`${entry.id}_membership_id`]}>
+              <Field
+                label="Membership ID"
+                error={errors[`${entry.id}_membership_id`]}
+              >
                 <FlameInput
                   value={entry.membership_id}
-                  onChange={(e) => onFieldChange(entry.id, "membership_id", e.target.value)}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "membership_id", e.target.value)
+                  }
                   placeholder="Optional"
                 />
               </Field>
@@ -1014,11 +1249,11 @@ const initialFormData: ProfileFormData = {
   cnic: "",
   passport_no: "",
   domicile: "",
-  mobile_prefix: "+92",
+  mobile_prefix: "",
   mobile_number: "",
-  home_prefix: "+92",
+  home_prefix: "",
   home_number: "",
-  office_prefix: "+92",
+  office_prefix: "",
   office_number: "",
   current_address: "",
   permanent_address: "",
@@ -1039,8 +1274,7 @@ export default function ProfileTabs() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // -------------------------------------------------------------------------
-  // Validation — every field on the currently active tab is checked
-  // (Passport Number is the sole intentional exception, per request).
+  // Validation — every field on the currently active tab is checked.
   // -------------------------------------------------------------------------
   function validate() {
     const newErrors: Record<string, string> = {};
@@ -1090,7 +1324,10 @@ export default function ProfileTabs() {
       if (!formData.birth_city) {
         newErrors.birth_city = "Birth city is required";
       }
-      if (formData.birth_city === "other" && !formData.birth_city_other?.trim()) {
+      if (
+        formData.birth_city === "other" &&
+        !formData.birth_city_other?.trim()
+      ) {
         newErrors.birth_city_other = "Please specify your birth city";
       }
 
@@ -1098,49 +1335,64 @@ export default function ProfileTabs() {
         newErrors.is_pakistani = "Please select an option";
       }
 
+      // CNIC and passport are mutually exclusive, based on citizenship.
       if (formData.is_pakistani === "Yes") {
         if (!formData.cnic?.trim()) {
           newErrors.cnic = "CNIC is required";
         } else if (!CNIC_REGEX.test(formData.cnic.trim())) {
-          newErrors.cnic = "Format must be 00000-0000000-0";
+          newErrors.cnic = "CNIC must be exactly 13 digits";
+        }
+      } else if (formData.is_pakistani === "No") {
+        if (!formData.passport_no?.trim()) {
+          newErrors.passport_no = "Passport number is required";
         }
       }
 
-      // Passport number is intentionally left unvalidated.
-
-      if (formData.domicile && formData.domicile.trim().length < 2) {
+      const domicile = formData.domicile?.trim() || "";
+      if (!domicile) {
+        newErrors.domicile = "Domicile is required";
+      } else if (domicile.length < 2) {
         newErrors.domicile = "Domicile looks too short";
       }
 
       if (!formData.mobile_prefix?.trim()) {
-        newErrors.mobile_prefix = "Country code is required";
+        newErrors.mobile_prefix = "Network code is required";
       } else if (!PREFIX_REGEX.test(formData.mobile_prefix.trim())) {
-        newErrors.mobile_prefix = "Use format +92";
+        newErrors.mobile_prefix = "Use format 03xx";
       }
       if (!formData.mobile_number?.trim()) {
         newErrors.mobile_number = "Mobile number is required";
       } else if (!MOBILE_REGEX.test(formData.mobile_number.trim())) {
-        newErrors.mobile_number = "Enter a valid 10-digit mobile number";
+        newErrors.mobile_number = "Enter a valid 7-digit mobile number";
       }
 
-      if (formData.home_number || formData.home_prefix !== "+92") {
-        if (formData.home_prefix && !PREFIX_REGEX.test(formData.home_prefix.trim())) {
-          newErrors.home_prefix = "Use format +92";
+      // Home phone is optional. Only validate format once the person has
+      // started filling either half of it in.
+      const homePrefixTrimmed = formData.home_prefix?.trim() || "";
+      const homeNumberTrimmed = formData.home_number?.trim() || "";
+      if (homePrefixTrimmed || homeNumberTrimmed) {
+        if (!homePrefixTrimmed) {
+          newErrors.home_prefix = "Area code is required";
+        } else if (!PREFIX_REGEX.test(homePrefixTrimmed)) {
+          newErrors.home_prefix = "Use format 021";
         }
-        if (formData.home_number && !LANDLINE_REGEX.test(formData.home_number.trim())) {
+        if (!homeNumberTrimmed) {
+          newErrors.home_number = "Home phone number is required";
+        } else if (!LANDLINE_REGEX.test(homeNumberTrimmed)) {
           newErrors.home_number = "Enter a valid phone number";
         }
       }
-
-      if (!formData.office_prefix?.trim()) {
-        newErrors.office_prefix = "Country code is required";
-      } else if (!PREFIX_REGEX.test(formData.office_prefix.trim())) {
-        newErrors.office_prefix = "Use format +92";
-      }
-      if (!formData.office_number?.trim()) {
-        newErrors.office_number = "Office phone is required";
-      } else if (!LANDLINE_REGEX.test(formData.office_number.trim())) {
-        newErrors.office_number = "Enter a valid phone number";
+      if (formData.office_prefix || formData.office_number) {
+        if (!formData.office_prefix?.trim()) {
+          newErrors.office_prefix = "Area code is required";
+        } else if (!PREFIX_REGEX.test(formData.office_prefix.trim())) {
+          newErrors.office_prefix = "Use format 021";
+        }
+        if (!formData.office_number?.trim()) {
+          newErrors.office_number = "Office phone number is required";
+        } else if (!LANDLINE_REGEX.test(formData.office_number.trim())) {
+          newErrors.office_number = "Enter a valid phone number";
+        }
       }
 
       const currentAddress = formData.current_address?.trim() || "";
@@ -1151,7 +1403,9 @@ export default function ProfileTabs() {
       }
 
       const permanentAddress = formData.permanent_address?.trim() || "";
-      if (permanentAddress && permanentAddress.length < 10) {
+      if (!permanentAddress) {
+        newErrors.permanent_address = "Permanent address is required";
+      } else if (permanentAddress.length < 10) {
         newErrors.permanent_address = "Please provide a more complete address";
       }
 
@@ -1181,8 +1435,13 @@ export default function ProfileTabs() {
         if (!entry.start_date) {
           newErrors[`${entry.id}_start_date`] = "Start date is required";
         }
-        if (entry.start_date && entry.end_date && entry.end_date < entry.start_date) {
-          newErrors[`${entry.id}_end_date`] = "End date can't be before the start date";
+        if (
+          entry.start_date &&
+          entry.end_date &&
+          entry.end_date < entry.start_date
+        ) {
+          newErrors[`${entry.id}_end_date`] =
+            "End date can't be before the start date";
         }
       });
     }
@@ -1190,7 +1449,8 @@ export default function ProfileTabs() {
     if (activeTab === "education") {
       formData.education.forEach((entry) => {
         if (!entry.degree.trim()) {
-          newErrors[`${entry.id}_degree`] = "Degree / qualification is required";
+          newErrors[`${entry.id}_degree`] =
+            "Degree / qualification is required";
         }
         if (!entry.institution.trim()) {
           newErrors[`${entry.id}_institution`] = "Institution is required";
@@ -1209,7 +1469,8 @@ export default function ProfileTabs() {
           newErrors[`${entry.id}_name`] = "Certificate name is required";
         }
         if (!entry.organisation.trim()) {
-          newErrors[`${entry.id}_organisation`] = "Issuing organisation is required";
+          newErrors[`${entry.id}_organisation`] =
+            "Issuing organisation is required";
         }
         if (!entry.issue_date) {
           newErrors[`${entry.id}_issue_date`] = "Issue date is required";
@@ -1229,8 +1490,38 @@ export default function ProfileTabs() {
     return Object.keys(newErrors).length === 0;
   }
 
-  function handleChange(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    const { name, value } = e.target;
+  // Fields where only digits should ever be typeable — this stops a person
+  // from pasting/typing letters into a phone number in the first place,
+  // rather than only flagging it after they hit Save.
+  const DIGITS_ONLY_FIELDS = new Set([
+    "cnic",
+    "mobile_prefix",
+    "mobile_number",
+    "home_prefix",
+    "home_number",
+    "office_prefix",
+    "office_number",
+    "ssgc_employee_number",
+  ]);
+
+  // Fields restricted to human-name characters as the person types.
+  const NAME_ONLY_FIELDS = new Set(["father_name", "ssgc_employee_name"]);
+
+  function sanitizeValue(name: string, value: string): string {
+    if (DIGITS_ONLY_FIELDS.has(name)) {
+      return value.replace(/\D+/g, "");
+    }
+    if (NAME_ONLY_FIELDS.has(name)) {
+      return value.replace(/[^A-Za-z\s.'-]+/g, "");
+    }
+    return value;
+  }
+
+  function handleChange(
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) {
+    const { name } = e.target;
+    const value = sanitizeValue(name, e.target.value);
     setFormData((prev) => {
       const updated = { ...prev, [name]: value };
       if (name === "birth_city" && value !== "other") {
@@ -1249,7 +1540,23 @@ export default function ProfileTabs() {
       return updated;
     });
     setErrors((prev) => {
-      if (!prev[name]) return prev;
+      if (!prev[name]) {
+        // Even if this exact field has no error, switching is_pakistani or
+        // already_worked_ssgc can invalidate errors on dependent fields
+        // (cnic/passport_no, ssgc_employee_name/number) — clear those too.
+        if (name === "is_pakistani" || name === "already_worked_ssgc") {
+          const dependentKeys =
+            name === "is_pakistani"
+              ? ["cnic", "passport_no"]
+              : ["ssgc_employee_name", "ssgc_employee_number"];
+          const hasDependentError = dependentKeys.some((k) => prev[k]);
+          if (!hasDependentError) return prev;
+          const updated = { ...prev };
+          dependentKeys.forEach((k) => delete updated[k]);
+          return updated;
+        }
+        return prev;
+      }
       const updated = { ...prev };
       delete updated[name];
       return updated;
@@ -1265,12 +1572,15 @@ export default function ProfileTabs() {
 
   // Generic helpers for the four repeatable-entry tabs -----------------------
 
-  function makeEntryHandlers<K extends "experience" | "education" | "certificates" | "memberships">(
-    key: K,
-    makeEmpty: (id: number) => ProfileFormData[K][number],
-  ) {
+  function makeEntryHandlers<
+    K extends "experience" | "education" | "certificates" | "memberships",
+  >(key: K, makeEmpty: (id: number) => ProfileFormData[K][number]) {
     return {
-      onFieldChange: (id: number, field: keyof ProfileFormData[K][number], value: string) => {
+      onFieldChange: (
+        id: number,
+        field: keyof ProfileFormData[K][number],
+        value: string,
+      ) => {
         setFormData((prev) => ({
           ...prev,
           [key]: (prev[key] as any[]).map((entry) =>
@@ -1303,7 +1613,10 @@ export default function ProfileTabs() {
 
   const experienceHandlers = makeEntryHandlers("experience", emptyExperience);
   const educationHandlers = makeEntryHandlers("education", emptyEducation);
-  const certificatesHandlers = makeEntryHandlers("certificates", emptyCertificate);
+  const certificatesHandlers = makeEntryHandlers(
+    "certificates",
+    emptyCertificate,
+  );
   const membershipsHandlers = makeEntryHandlers("memberships", emptyMembership);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1317,7 +1630,10 @@ export default function ProfileTabs() {
       switch (activeTab) {
         case "photo": {
           if (!(formData.image instanceof File)) {
-            setErrors({ image: "Please select a photo first" });
+            setErrors((prev) => ({
+              ...prev,
+              image: "Please select a photo first",
+            }));
             return;
           }
           const photoPayload = new FormData();
@@ -1329,7 +1645,14 @@ export default function ProfileTabs() {
         }
 
         case "personal": {
-          const { image, experience, education, certificates, memberships, ...personalData } = formData;
+          const {
+            image,
+            experience,
+            education,
+            certificates,
+            memberships,
+            ...personalData
+          } = formData;
           await axios.patch("/api/profile", personalData, {
             withCredentials: true,
           });
@@ -1337,30 +1660,46 @@ export default function ProfileTabs() {
         }
 
         case "experience": {
-          await axios.patch("/api/profile", { experience: formData.experience }, {
-            withCredentials: true,
-          });
+          await axios.patch(
+            "/api/profile",
+            { experience: formData.experience },
+            {
+              withCredentials: true,
+            },
+          );
           break;
         }
 
         case "education": {
-          await axios.patch("/api/profile", { education: formData.education }, {
-            withCredentials: true,
-          });
+          await axios.patch(
+            "/api/profile",
+            { education: formData.education },
+            {
+              withCredentials: true,
+            },
+          );
           break;
         }
 
         case "certificates": {
-          await axios.patch("/api/profile", { certificates: formData.certificates }, {
-            withCredentials: true,
-          });
+          await axios.patch(
+            "/api/profile",
+            { certificates: formData.certificates },
+            {
+              withCredentials: true,
+            },
+          );
           break;
         }
 
         case "memberships": {
-          await axios.patch("/api/profile", { memberships: formData.memberships }, {
-            withCredentials: true,
-          });
+          await axios.patch(
+            "/api/profile",
+            { memberships: formData.memberships },
+            {
+              withCredentials: true,
+            },
+          );
           break;
         }
 
@@ -1378,14 +1717,21 @@ export default function ProfileTabs() {
   }
 
   return (
-    <div className="min-h-screen py-10 px-4" style={{ background: flame.paper }}>
+    <div
+      className="min-h-screen py-10 px-4"
+      style={{ background: flame.paper }}
+    >
       <div className="max-w-7xl mx-auto">
         <div className="mb-6 flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
             style={{ background: flameGradient }}
           >
-            <Flame className="w-5 h-5 text-white" fill="white" fillOpacity={0.25} />
+            <Flame
+              className="w-5 h-5 text-white"
+              fill="white"
+              fillOpacity={0.25}
+            />
           </div>
           <div>
             <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
@@ -1399,12 +1745,22 @@ export default function ProfileTabs() {
 
         <div
           className="bg-white rounded-xl overflow-hidden"
-          style={{ border: "1px solid #E7E5E1", boxShadow: "0 1px 2px rgba(11,31,51,0.04)" }}
+          style={{
+            border: "1px solid #E7E5E1",
+            boxShadow: "0 1px 2px rgba(11,31,51,0.04)",
+          }}
         >
           <div className="h-1" style={{ background: flameGradient }} />
 
-          <div className="border-b overflow-x-auto" style={{ borderColor: "#E7E5E1" }}>
-            <nav className="flex min-w-max gap-1 px-2" role="tablist" aria-label="Profile sections">
+          <div
+            className="border-b overflow-x-auto"
+            style={{ borderColor: "#E7E5E1" }}
+          >
+            <nav
+              className="flex min-w-max gap-1 px-2"
+              role="tablist"
+              aria-label="Profile sections"
+            >
               {TABS.map((tab, index) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
@@ -1413,13 +1769,17 @@ export default function ProfileTabs() {
                     key={tab.id}
                     role="tab"
                     aria-selected={isActive}
+                    disabled={saving}
                     onClick={() => setActiveTab(tab.id)}
-                    className="relative flex items-center gap-2 px-5 py-3.5 mt-1.5 rounded-t-md text-sm whitespace-nowrap transition-colors focus:outline-none"
+                    className="relative flex items-center gap-2 px-5 py-3.5 mt-1.5 rounded-t-md text-sm whitespace-nowrap transition-colors focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{
                       color: isActive ? flame.core : "#334155",
                       fontWeight: isActive ? 700 : 600,
                       background: isActive ? "#F8FAFC" : "transparent",
-                      borderRight: index !== TABS.length - 1 ? "1px solid #E2E8F0" : "none",
+                      borderRight:
+                        index !== TABS.length - 1
+                          ? "1px solid #E2E8F0"
+                          : "none",
                     }}
                   >
                     <Icon className="w-4 h-4" />
@@ -1445,19 +1805,39 @@ export default function ProfileTabs() {
               />
             )}
             {activeTab === "personal" && (
-              <PersonalTab formData={formData} onChange={handleChange} errors={errors} />
+              <PersonalTab
+                formData={formData}
+                onChange={handleChange}
+                errors={errors}
+              />
             )}
             {activeTab === "experience" && (
-              <ExperienceTab entries={formData.experience} errors={errors} {...experienceHandlers} />
+              <ExperienceTab
+                entries={formData.experience}
+                errors={errors}
+                {...experienceHandlers}
+              />
             )}
             {activeTab === "education" && (
-              <EducationTab entries={formData.education} errors={errors} {...educationHandlers} />
+              <EducationTab
+                entries={formData.education}
+                errors={errors}
+                {...educationHandlers}
+              />
             )}
             {activeTab === "certificates" && (
-              <CertificatesTab entries={formData.certificates} errors={errors} {...certificatesHandlers} />
+              <CertificatesTab
+                entries={formData.certificates}
+                errors={errors}
+                {...certificatesHandlers}
+              />
             )}
             {activeTab === "memberships" && (
-              <MembershipsTab entries={formData.memberships} errors={errors} {...membershipsHandlers} />
+              <MembershipsTab
+                entries={formData.memberships}
+                errors={errors}
+                {...membershipsHandlers}
+              />
             )}
           </div>
 
@@ -1466,12 +1846,17 @@ export default function ProfileTabs() {
             style={{ borderColor: "#E7E5E1", background: "#FBFBFA" }}
           >
             <div>
-              {submitError && <p className="text-sm font-medium text-rose-600">{submitError}</p>}
+              {submitError && (
+                <p className="text-sm font-medium text-rose-600">
+                  {submitError}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                disabled={saving}
+                className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
