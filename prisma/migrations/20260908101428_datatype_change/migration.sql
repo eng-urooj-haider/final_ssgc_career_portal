@@ -6,5 +6,4 @@
 
 */
 -- AlterTable
-ALTER TABLE `cities` DROP COLUMN `city`,
-    ADD COLUMN `city` VARCHAR(191) NOT NULL after id;
+

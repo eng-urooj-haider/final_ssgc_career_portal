@@ -197,10 +197,10 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
     }
   }
 
-  // const fetchUserProfile = async () => {
-  //   const res = await axios.get("/api/user_profile", { withCredentials: true });
-  //   return res.data.profile;
-  // };
+  const fetchUserProfile = async () => {
+    const res = await axios.get("/api/user_profile", { withCredentials: true });
+    return res.data.profile;
+  };
 
   const {
     data: profile,
@@ -301,8 +301,8 @@ interface PersonalFormData {
   birth_country: string;
   birth_city: string;
   birth_city_other: string;
-  is_pakistani: string;
-  cnic: string;
+  // is_pakistani: string;
+  // cnic: string;
   passport_no: string;
   domicile: string;
   mobile_prefix: string;
@@ -324,7 +324,12 @@ interface PersonalTabProps {
   errors: Record<string, string>;
 }
 
-function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
+function PersonalTab({
+  formData,
+  onChange,
+  errors,
+  setFormData,
+}: PersonalTabProps) {
   const {
     data: cities,
     isLoading: isLoadingCities,
@@ -342,7 +347,23 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
     queryKey: ["countries"],
     queryFn: GetCountries,
   });
-
+  const fetchUserProfile = async () => {
+    const res = await axios.get("/api/user_profile", { withCredentials: true });
+    return res.data.profile;
+  };
+  const {
+    data: profile,
+    isLoading: isLoadingProfile,
+    isError: isProfileError,
+  } = useQuery({
+    queryKey: ["profile_data"],
+    queryFn: fetchUserProfile,
+  });
+  React.useEffect(() => {
+    if (profile) {
+      setFormData(profile);
+    }
+  }, [profile]);
   return (
     <div>
       <SectionHeading
@@ -462,7 +483,7 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
           </Field>
         )}
 
-        <Field label="Is Pakistani?" required error={errors.is_pakistani}>
+        {/* <Field label="Is Pakistani?" required error={errors.is_pakistani}>
           <select
             name="is_pakistani"
             value={formData.is_pakistani || ""}
@@ -473,10 +494,10 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
             <option value="Yes">Yes</option>
             <option value="No">No</option>
           </select>
-        </Field>
+        </Field> */}
 
         {/* Only one of CNIC / Passport applies, depending on citizenship. */}
-        {formData.is_pakistani === "Yes" && (
+        {/* {formData.is_pakistani === "Yes" && (
           <Field label="CNIC" required error={errors.cnic}>
             <FlameInput
               name="cnic"
@@ -488,19 +509,17 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
               inputMode="numeric"
             />
           </Field>
-        )}
+        )} */}
 
-        {formData.is_pakistani === "No" && (
-          <Field label="Passport Number" required error={errors.passport_no}>
-            <FlameInput
-              name="passport_no"
-              value={formData.passport_no || ""}
-              onChange={onChange}
-              placeholder="AB1234567"
-              maxLength={15}
-            />
-          </Field>
-        )}
+        <Field label="Passport Number" required error={errors.passport_no}>
+          <FlameInput
+            name="passport_no"
+            value={formData.passport_no || ""}
+            onChange={onChange}
+            placeholder="AB1234567"
+            maxLength={15}
+          />
+        </Field>
 
         <Field label="Province of Domicile" required error={errors.domicile}>
           <FlameInput
@@ -794,7 +813,26 @@ function ExperienceTab({
   onAdd,
   onRemove,
   errors,
+  formData
 }: ExperienceTabProps) {
+
+  const {
+    data: cities,
+    isLoading: isLoadingCities,
+    error: citiesError,
+  } = useQuery({
+    queryKey: ["cities"],
+    queryFn: GetCities,
+  });
+
+  const {
+    data: countries,
+    isLoading: isLoadingCountries,
+    error: countriesError,
+  } = useQuery({
+    queryKey: ["countries"],
+    queryFn: GetCountries,
+  });
   return (
     <div>
       <SectionHeading
@@ -806,7 +844,7 @@ function ExperienceTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            // removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -836,6 +874,74 @@ function ExperienceTab({
                 />
               </Field>
               <Field
+                label="Birth Country"
+                required
+                error={errors.birth_country}
+              >
+                <select
+                  name="birth_country"
+                  value={formData.birth_country || ""}
+                  // onChange={onChange}
+                  disabled={isLoadingCountries}
+                  className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
+                >
+                  <option value="">
+                    {isLoadingCountries
+                      ? "Loading countries..."
+                      : "Select country"}
+                  </option>
+                  {countriesError && (
+                    <option disabled>Failed to load countries</option>
+                  )}
+                  {countries?.map(
+                    (country: { id: number; country: string }) => (
+                      <option key={country.id} value={country.country}>
+                        {country.country}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </Field>
+
+              <Field label="Birth City" required error={errors.birth_city}>
+                <select
+                  name="birth_city"
+                  value={formData.birth_city || ""}
+                  // onChange={onChange}
+                  disabled={isLoadingCities}
+                  className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
+                >
+                  <option value="">
+                    {isLoadingCities ? "Loading cities..." : "Select city"}
+                  </option>
+                  {citiesError && (
+                    <option disabled>Failed to load cities</option>
+                  )}
+                  {cities?.map((city: { id: number; city: string }) => (
+                    <option key={city.id} value={city.city}>
+                      {city.city}
+                    </option>
+                  ))}
+                  <option value="other">Other</option>
+                </select>
+              </Field>
+
+              {formData.birth_city === "other" && (
+                <Field
+                  label="Birth City (Other)"
+                  required
+                  error={errors.birth_city_other}
+                >
+                  <FlameInput
+                    name="birth_city_other"
+                    value={formData.birth_city_other || ""}
+                    onChange={onChange}
+                    placeholder="Enter your city"
+                  />
+                </Field>
+              )}
+
+              <Field
                 label="Start date"
                 required
                 error={errors[`${entry.id}_start_date`]}
@@ -857,8 +963,15 @@ function ExperienceTab({
                   }
                 />
               </Field>
-            </div>
-            <div className="mt-5">
+              <Field label="Salary">
+                <FlameInput
+                  type="number"
+                  value={entry.salary}
+                  // onChange={(e) =>
+                  //   onFieldChange(entry.id, "salary", e.target.value)
+                  // }
+                />
+              </Field>
               <Field
                 label="Responsibilities"
                 error={errors[`${entry.id}_responsibilities`]}
@@ -870,6 +983,19 @@ function ExperienceTab({
                     onFieldChange(entry.id, "responsibilities", e.target.value)
                   }
                   placeholder="Briefly describe your role and achievements"
+                />
+              </Field>
+              <Field
+                label="Reason of leaving"
+                // error={errors[`${entry.id}_responsibilities`]}
+              >
+                <FlameTextarea
+                  rows={3}
+                  value={entry.leaving}
+                  // onChange={(e) =>
+                  //   onFieldChange(entry.id, "responsibilities", e.target.value)
+                  // }
+                  placeholder="Reason of leaving"
                 />
               </Field>
             </div>
@@ -1245,8 +1371,8 @@ const initialFormData: ProfileFormData = {
   birth_country: "",
   birth_city: "",
   birth_city_other: "",
-  is_pakistani: "",
-  cnic: "",
+  // is_pakistani: "",
+  // cnic: "",
   passport_no: "",
   domicile: "",
   mobile_prefix: "",
@@ -1331,22 +1457,22 @@ export default function ProfileTabs() {
         newErrors.birth_city_other = "Please specify your birth city";
       }
 
-      if (!formData.is_pakistani) {
-        newErrors.is_pakistani = "Please select an option";
-      }
+      // if (!formData.is_pakistani) {
+      //   newErrors.is_pakistani = "Please select an option";
+      // }
 
       // CNIC and passport are mutually exclusive, based on citizenship.
-      if (formData.is_pakistani === "Yes") {
-        if (!formData.cnic?.trim()) {
-          newErrors.cnic = "CNIC is required";
-        } else if (!CNIC_REGEX.test(formData.cnic.trim())) {
-          newErrors.cnic = "CNIC must be exactly 13 digits";
-        }
-      } else if (formData.is_pakistani === "No") {
-        if (!formData.passport_no?.trim()) {
-          newErrors.passport_no = "Passport number is required";
-        }
-      }
+      // if (formData.is_pakistani === "Yes") {
+      //   if (!formData.cnic?.trim()) {
+      //     newErrors.cnic = "CNIC is required";
+      //   } else if (!CNIC_REGEX.test(formData.cnic.trim())) {
+      //     newErrors.cnic = "CNIC must be exactly 13 digits";
+      //   }
+      // } else if (formData.is_pakistani === "No") {
+      //   if (!formData.passport_no?.trim()) {
+      //     newErrors.passport_no = "Passport number is required";
+      //   }
+      // }
 
       const domicile = formData.domicile?.trim() || "";
       if (!domicile) {
@@ -1494,7 +1620,7 @@ export default function ProfileTabs() {
   // from pasting/typing letters into a phone number in the first place,
   // rather than only flagging it after they hit Save.
   const DIGITS_ONLY_FIELDS = new Set([
-    "cnic",
+    // "cnic",
     "mobile_prefix",
     "mobile_number",
     "home_prefix",
@@ -1527,12 +1653,12 @@ export default function ProfileTabs() {
       if (name === "birth_city" && value !== "other") {
         updated.birth_city_other = "";
       }
-      if (name === "is_pakistani" && value === "Yes") {
-        updated.passport_no = "";
-      }
-      if (name === "is_pakistani" && value === "No") {
-        updated.cnic = "";
-      }
+      // if (name === "is_pakistani" && value === "Yes") {
+      //   updated.passport_no = "";
+      // }
+      // if (name === "is_pakistani" && value === "No") {
+      //   updated.cnic = "";
+      // }
       if (name === "already_worked_ssgc" && value !== "Yes") {
         updated.ssgc_employee_name = "";
         updated.ssgc_employee_number = "";
@@ -1545,10 +1671,7 @@ export default function ProfileTabs() {
         // already_worked_ssgc can invalidate errors on dependent fields
         // (cnic/passport_no, ssgc_employee_name/number) — clear those too.
         if (name === "is_pakistani" || name === "already_worked_ssgc") {
-          const dependentKeys =
-            name === "is_pakistani"
-              ? ["cnic", "passport_no"]
-              : ["ssgc_employee_name", "ssgc_employee_number"];
+          const dependentKeys = ["ssgc_employee_name", "ssgc_employee_number"];
           const hasDependentError = dependentKeys.some((k) => prev[k]);
           if (!hasDependentError) return prev;
           const updated = { ...prev };
@@ -1809,12 +1932,14 @@ export default function ProfileTabs() {
                 formData={formData}
                 onChange={handleChange}
                 errors={errors}
+                setFormData={setFormData}
               />
             )}
             {activeTab === "experience" && (
               <ExperienceTab
                 entries={formData.experience}
                 errors={errors}
+                formData
                 {...experienceHandlers}
               />
             )}
