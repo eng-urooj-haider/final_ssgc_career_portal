@@ -777,44 +777,55 @@ function AddButton({ onClick, label }: AddButtonProps) {
 // Experience tab (lifted into shared state)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Experience tab (lifted into shared state)
+// ---------------------------------------------------------------------------
+
 interface ExperienceEntry {
   id: number;
   job_title: string;
   company: string;
+  country: string;
+  city: string;
   start_date: string;
   end_date: string;
+  salary: string;
   responsibilities: string;
+  reason: string;
 }
 
 const emptyExperience = (id: number): ExperienceEntry => ({
   id,
   job_title: "",
   company: "",
+  country: "",
+  city: "",
   start_date: "",
   end_date: "",
+  salary: "",
   responsibilities: "",
+  reason: "",
 });
 
 interface ExperienceTabProps {
   entries: ExperienceEntry[];
-  onFieldChange: (
-    id: number,
-    field: keyof ExperienceEntry,
-    value: string,
-  ) => void;
+  onFieldChange: (id: number, field: keyof ExperienceEntry, value: string) => void;
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
 }
 
-function ExperienceTab({
-  entries,
-  onFieldChange,
-  onAdd,
-  onRemove,
-  errors,
-  formData
-}: ExperienceTabProps) {
+function ExperienceTab({ entries, onFieldChange, onAdd, onRemove, errors }: ExperienceTabProps) {
+  // Job location fields — this tab's own countries/cities lookups,
+  // deliberately separate from the Personal tab's birth country/city.
+  const {
+    data: countries,
+    isLoading: isLoadingCountries,
+    error: countriesError,
+  } = useQuery({
+    queryKey: ["countries"],
+    queryFn: GetCountries,
+  });
 
   const {
     data: cities,
@@ -825,182 +836,117 @@ function ExperienceTab({
     queryFn: GetCities,
   });
 
-  const {
-    data: countries,
-    isLoading: isLoadingCountries,
-    error: countriesError,
-  } = useQuery({
-    queryKey: ["countries"],
-    queryFn: GetCountries,
-  });
   return (
     <div>
-      <SectionHeading
-        title="Experience"
-        description="List your work history, most recent first."
-      />
+      <SectionHeading title="Experience" description="List your work history, most recent first." />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            // removeDisabled={entries.length === 1}
+            removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field
-                label="Job title"
-                required
-                error={errors[`${entry.id}_job_title`]}
-              >
+              <Field label="Job title" required error={errors[`${entry.id}_job_title`]}>
                 <FlameInput
                   value={entry.job_title}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "job_title", e.target.value)
-                  }
+                  onChange={(e) => onFieldChange(entry.id, "job_title", e.target.value)}
                   placeholder="Software Engineer"
                 />
               </Field>
-              <Field
-                label="Company"
-                required
-                error={errors[`${entry.id}_company`]}
-              >
+
+              <Field label="Company" required error={errors[`${entry.id}_company`]}>
                 <FlameInput
                   value={entry.company}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "company", e.target.value)
-                  }
+                  onChange={(e) => onFieldChange(entry.id, "company", e.target.value)}
                   placeholder="SSGC"
                 />
               </Field>
-              <Field
-                label="Birth Country"
-                required
-                error={errors.birth_country}
-              >
+
+              <Field label="Country" error={errors[`${entry.id}_country`]}>
                 <select
-                  name="birth_country"
-                  value={formData.birth_country || ""}
-                  // onChange={onChange}
+                  value={entry.country}
+                  onChange={(e) => onFieldChange(entry.id, "country", e.target.value)}
                   disabled={isLoadingCountries}
                   className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
                 >
                   <option value="">
-                    {isLoadingCountries
-                      ? "Loading countries..."
-                      : "Select country"}
+                    {isLoadingCountries ? "Loading countries..." : "Select country"}
                   </option>
-                  {countriesError && (
-                    <option disabled>Failed to load countries</option>
-                  )}
-                  {countries?.map(
-                    (country: { id: number; country: string }) => (
-                      <option key={country.id} value={country.country}>
-                        {country.country}
-                      </option>
-                    ),
-                  )}
+                  {countriesError && <option disabled>Failed to load countries</option>}
+                  {countries?.map((country: { id: number; country: string }) => (
+                    <option key={country.id} value={country.country}>
+                      {country.country}
+                    </option>
+                  ))}
                 </select>
               </Field>
 
-              <Field label="Birth City" required error={errors.birth_city}>
+              <Field label="City" error={errors[`${entry.id}_city`]}>
                 <select
-                  name="birth_city"
-                  value={formData.birth_city || ""}
-                  // onChange={onChange}
+                  value={entry.city}
+                  onChange={(e) => onFieldChange(entry.id, "city", e.target.value)}
                   disabled={isLoadingCities}
                   className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
                 >
                   <option value="">
                     {isLoadingCities ? "Loading cities..." : "Select city"}
                   </option>
-                  {citiesError && (
-                    <option disabled>Failed to load cities</option>
-                  )}
+                  {citiesError && <option disabled>Failed to load cities</option>}
                   {cities?.map((city: { id: number; city: string }) => (
                     <option key={city.id} value={city.city}>
                       {city.city}
                     </option>
                   ))}
-                  <option value="other">Other</option>
                 </select>
               </Field>
 
-              {formData.birth_city === "other" && (
-                <Field
-                  label="Birth City (Other)"
-                  required
-                  error={errors.birth_city_other}
-                >
-                  <FlameInput
-                    name="birth_city_other"
-                    value={formData.birth_city_other || ""}
-                    onChange={onChange}
-                    placeholder="Enter your city"
-                  />
-                </Field>
-              )}
-
-              <Field
-                label="Start date"
-                required
-                error={errors[`${entry.id}_start_date`]}
-              >
+              <Field label="Start date" required error={errors[`${entry.id}_start_date`]}>
                 <FlameInput
                   type="month"
                   value={entry.start_date}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "start_date", e.target.value)
-                  }
+                  onChange={(e) => onFieldChange(entry.id, "start_date", e.target.value)}
                 />
               </Field>
+
               <Field label="End date" error={errors[`${entry.id}_end_date`]}>
                 <FlameInput
                   type="month"
                   value={entry.end_date}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "end_date", e.target.value)
-                  }
+                  onChange={(e) => onFieldChange(entry.id, "end_date", e.target.value)}
                 />
               </Field>
-              <Field label="Salary">
+
+              <Field label="Salary" error={errors[`${entry.id}_salary`]}>
                 <FlameInput
                   type="number"
                   value={entry.salary}
-                  // onChange={(e) =>
-                  //   onFieldChange(entry.id, "salary", e.target.value)
-                  // }
+                  onChange={(e) => onFieldChange(entry.id, "salary", e.target.value)}
+                  placeholder="80000"
                 />
               </Field>
-              <Field
-                label="Responsibilities"
-                error={errors[`${entry.id}_responsibilities`]}
-              >
+
+              <Field label="Responsibilities" error={errors[`${entry.id}_responsibilities`]}>
                 <FlameTextarea
                   rows={3}
                   value={entry.responsibilities}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "responsibilities", e.target.value)
-                  }
+                  onChange={(e) => onFieldChange(entry.id, "responsibilities", e.target.value)}
                   placeholder="Briefly describe your role and achievements"
                 />
               </Field>
-              <Field
-                label="Reason of leaving"
-                // error={errors[`${entry.id}_responsibilities`]}
-              >
+
+              <Field label="Reason of leaving" error={errors[`${entry.id}_reason`]}>
                 <FlameTextarea
                   rows={3}
-                  value={entry.leaving}
-                  // onChange={(e) =>
-                  //   onFieldChange(entry.id, "responsibilities", e.target.value)
-                  // }
+                  value={entry.reason}
+                  onChange={(e) => onFieldChange(entry.id, "reason", e.target.value)}
                   placeholder="Reason of leaving"
                 />
               </Field>
             </div>
           </RepeatableCard>
         ))}
+        
       </div>
       <div className="mt-4">
         <AddButton label="Add another position" onClick={onAdd} />
