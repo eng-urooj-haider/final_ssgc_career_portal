@@ -1,1 +1,0 @@
-ALTER TABLE `job` MODIFY COLUMN `city` JSON NOT NULL AFTER `responsibility`;

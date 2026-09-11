@@ -13,9 +13,9 @@ datasource db {
 }
 
 model User {
-  id       Int     @id @default(autoincrement())
-  email    String  @unique
-  password String  @db.Text
+  id       Int      @id @default(autoincrement())
+  email    String   @unique
+  password String   @db.Text
   role     String?
   profile  Profile?
 }
@@ -75,20 +75,37 @@ model Profile {
   ssgc_employee_number String?   @db.VarChar(10)
   created_at           DateTime  @default(now())
   updated_at           DateTime  @updatedAt
-  user  User  @relation(fields: [user_id], references: [id])
+  user                 User      @relation(fields: [user_id], references: [id])
+  experiences Experience[]
 }
 
 model cities {
   id         Int      @id @default(autoincrement())
-  city     String
-  province  String
+  city       String
+  province   String
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
 
 model countries {
   id         Int      @id @default(autoincrement())
-  country     String
+  country    String
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+}
+
+model Experience {
+  id             Int      @id @default(autoincrement())
+  profile_id     Int
+  profile        Profile  @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+  company        Int
+  city           Int
+  start_date     DateTime @default(now())
+  end_date       DateTime @default(now())
+  salary         String
+  responsibility String   @db.Text
+  reason         String   @db.Text
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+   @@index([profile_id])
 }
