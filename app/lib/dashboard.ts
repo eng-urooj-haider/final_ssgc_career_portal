@@ -12,3 +12,7 @@ export const GetCountries = async () => {
   const res = await axios.get("/api/countries", { withCredentials: true });
   return res.data.countries; // adjust to match your actual API response shape
 };
+export const GetExperiences = async() => {
+  const res = await axios.get("/api/experiences", { withCredentials: true });
+  return res.data.experiences;
+}

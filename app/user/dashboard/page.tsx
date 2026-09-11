@@ -20,7 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import axios from "axios";
-import { GetCities, GetCountries } from "@/app/lib/dashboard";
+import { GetCities, GetCountries, GetExperiences } from "@/app/lib/dashboard";
 import { useQuery } from "@tanstack/react-query";
 
 type TabId =
@@ -361,7 +361,29 @@ function PersonalTab({
   });
   React.useEffect(() => {
     if (profile) {
-      setFormData(profile);
+      setFormData((prev) => ({
+        ...prev,
+        father_name: profile.father_name ?? "",
+        marital_status: profile.marital_status ?? "",
+        children: profile.children ?? "",
+        date_of_birth: profile.date_of_birth ?? "",
+        birth_country: profile.birth_country ?? "",
+        birth_city: profile.birth_city ?? "",
+        birth_city_other: profile.birth_city_other ?? "",
+        passport_no: profile.passport_no ?? "",
+        domicile: profile.domicile ?? "",
+        mobile_prefix: profile.mobile_prefix ?? "",
+        mobile_number: profile.mobile_number ?? "",
+        home_prefix: profile.home_prefix ?? "",
+        home_number: profile.home_number ?? "",
+        office_prefix: profile.office_prefix ?? "",
+        office_number: profile.office_number ?? "",
+        current_address: profile.current_address ?? "",
+        permanent_address: profile.permanent_address ?? "",
+        already_worked_ssgc: profile.already_worked_ssgc ?? "",
+        ssgc_employee_name: profile.ssgc_employee_name ?? "",
+        ssgc_employee_number: profile.ssgc_employee_number ?? "",
+      }));
     }
   }, [profile]);
   return (
@@ -809,13 +831,24 @@ const emptyExperience = (id: number): ExperienceEntry => ({
 
 interface ExperienceTabProps {
   entries: ExperienceEntry[];
-  onFieldChange: (id: number, field: keyof ExperienceEntry, value: string) => void;
+  onFieldChange: (
+    id: number,
+    field: keyof ExperienceEntry,
+    value: string,
+  ) => void;
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
 }
 
-function ExperienceTab({ entries, onFieldChange, onAdd, onRemove, errors }: ExperienceTabProps) {
+function ExperienceTab({
+  entries,
+  onFieldChange,
+  setFormData,
+  onAdd,
+  onRemove,
+  errors,
+}: ExperienceTabProps) {
   // Job location fields — this tab's own countries/cities lookups,
   // deliberately separate from the Personal tab's birth country/city.
   const {
@@ -836,9 +869,44 @@ function ExperienceTab({ entries, onFieldChange, onAdd, onRemove, errors }: Expe
     queryFn: GetCities,
   });
 
+  const { data: experience } = useQuery({
+    queryKey: ["experiences"],
+    queryFn: GetExperiences,
+  });
+  function toMonthInput(date: string | Date | null | undefined): string {
+    if (!date) return "";
+    const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return "";
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
+  }
+
+  React.useEffect(() => {
+    if (experience && experience.length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        experience: experience.map((exp: any, index: number) => ({
+          id: exp.id ?? index + 1,
+          job_title: exp.job_title ?? "",
+          company: exp.company ?? "",
+          country: exp.country ?? "",
+          city: exp.city ?? "",
+          start_date: toMonthInput(exp.start_date ?? ""),
+          end_date: toMonthInput(exp.end_date ?? ""),
+          salary: exp.salary ?? "",
+          responsibilities: exp.responsibility ?? "",
+          reason: exp.reason ?? "",
+        })),
+      }));
+    }
+  }, [experience]);
   return (
     <div>
-      <SectionHeading title="Experience" description="List your work history, most recent first." />
+      <SectionHeading
+        title="Experience"
+        description="List your work history, most recent first."
+      />
       <div className="space-y-4">
         {entries.map((entry) => (
           <RepeatableCard
@@ -847,52 +915,76 @@ function ExperienceTab({ entries, onFieldChange, onAdd, onRemove, errors }: Expe
             removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              <Field label="Job title" required error={errors[`${entry.id}_job_title`]}>
+              <Field
+                label="Job title"
+                required
+                error={errors[`${entry.id}_job_title`]}
+              >
                 <FlameInput
-                  value={entry.job_title}
-                  onChange={(e) => onFieldChange(entry.id, "job_title", e.target.value)}
+                  value={entry.job_title || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "job_title", e.target.value)
+                  }
                   placeholder="Software Engineer"
                 />
               </Field>
 
-              <Field label="Company" required error={errors[`${entry.id}_company`]}>
+              <Field
+                label="Company"
+                required
+                error={errors[`${entry.id}_company`]}
+              >
                 <FlameInput
-                  value={entry.company}
-                  onChange={(e) => onFieldChange(entry.id, "company", e.target.value)}
+                  value={entry.company || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "company", e.target.value)
+                  }
                   placeholder="SSGC"
                 />
               </Field>
 
               <Field label="Country" error={errors[`${entry.id}_country`]}>
                 <select
-                  value={entry.country}
-                  onChange={(e) => onFieldChange(entry.id, "country", e.target.value)}
+                  value={entry.country || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "country", e.target.value)
+                  }
                   disabled={isLoadingCountries}
                   className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
                 >
                   <option value="">
-                    {isLoadingCountries ? "Loading countries..." : "Select country"}
+                    {isLoadingCountries
+                      ? "Loading countries..."
+                      : "Select country"}
                   </option>
-                  {countriesError && <option disabled>Failed to load countries</option>}
-                  {countries?.map((country: { id: number; country: string }) => (
-                    <option key={country.id} value={country.country}>
-                      {country.country}
-                    </option>
-                  ))}
+                  {countriesError && (
+                    <option disabled>Failed to load countries</option>
+                  )}
+                  {countries?.map(
+                    (country: { id: number; country: string }) => (
+                      <option key={country.id} value={country.country}>
+                        {country.country}
+                      </option>
+                    ),
+                  )}
                 </select>
               </Field>
 
               <Field label="City" error={errors[`${entry.id}_city`]}>
                 <select
-                  value={entry.city}
-                  onChange={(e) => onFieldChange(entry.id, "city", e.target.value)}
+                  value={entry.city || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "city", e.target.value)
+                  }
                   disabled={isLoadingCities}
                   className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
                 >
                   <option value="">
                     {isLoadingCities ? "Loading cities..." : "Select city"}
                   </option>
-                  {citiesError && <option disabled>Failed to load cities</option>}
+                  {citiesError && (
+                    <option disabled>Failed to load cities</option>
+                  )}
                   {cities?.map((city: { id: number; city: string }) => (
                     <option key={city.id} value={city.city}>
                       {city.city}
@@ -901,52 +993,71 @@ function ExperienceTab({ entries, onFieldChange, onAdd, onRemove, errors }: Expe
                 </select>
               </Field>
 
-              <Field label="Start date" required error={errors[`${entry.id}_start_date`]}>
+              <Field
+                label="Start date"
+                required
+                error={errors[`${entry.id}_start_date`]}
+              >
                 <FlameInput
                   type="month"
-                  value={entry.start_date}
-                  onChange={(e) => onFieldChange(entry.id, "start_date", e.target.value)}
+                  value={entry.start_date || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "start_date", e.target.value)
+                  }
                 />
               </Field>
 
               <Field label="End date" error={errors[`${entry.id}_end_date`]}>
                 <FlameInput
                   type="month"
-                  value={entry.end_date}
-                  onChange={(e) => onFieldChange(entry.id, "end_date", e.target.value)}
+                  value={entry.end_date || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "end_date", e.target.value)
+                  }
                 />
               </Field>
 
               <Field label="Salary" error={errors[`${entry.id}_salary`]}>
                 <FlameInput
                   type="number"
-                  value={entry.salary}
-                  onChange={(e) => onFieldChange(entry.id, "salary", e.target.value)}
+                  value={entry.salary || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "salary", e.target.value)
+                  }
                   placeholder="80000"
                 />
               </Field>
 
-              <Field label="Responsibilities" error={errors[`${entry.id}_responsibilities`]}>
+              <Field
+                label="Responsibilities"
+                error={errors[`${entry.id}_responsibilities`]}
+              >
                 <FlameTextarea
                   rows={3}
-                  value={entry.responsibilities}
-                  onChange={(e) => onFieldChange(entry.id, "responsibilities", e.target.value)}
+                  value={entry.responsibilities || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "responsibilities", e.target.value)
+                  }
                   placeholder="Briefly describe your role and achievements"
                 />
               </Field>
 
-              <Field label="Reason of leaving" error={errors[`${entry.id}_reason`]}>
+              <Field
+                label="Reason of leaving"
+                error={errors[`${entry.id}_reason`]}
+              >
                 <FlameTextarea
                   rows={3}
-                  value={entry.reason}
-                  onChange={(e) => onFieldChange(entry.id, "reason", e.target.value)}
+                  value={entry.reason || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "reason", e.target.value)
+                  }
                   placeholder="Reason of leaving"
                 />
               </Field>
             </div>
           </RepeatableCard>
         ))}
-        
       </div>
       <div className="mt-4">
         <AddButton label="Add another position" onClick={onAdd} />
@@ -1005,7 +1116,7 @@ function EducationTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            // removeDisabled={entries.length === 1}
+            removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1670,12 +1781,34 @@ export default function ProfileTabs() {
           [key]: [...(prev[key] as any[]), makeEmpty(Date.now())],
         }));
       },
-      onRemove: (id: number) => {
+      onRemove: async (id: number) => {
+        const confirmed = window.confirm(
+          `Are you sure you want to delete this ${key.slice(0, -1)}?`,
+        );
+        if (!confirmed) return;
+
         setFormData((prev) => {
           const list = prev[key] as any[];
           if (list.length === 1) return prev;
           return { ...prev, [key]: list.filter((entry) => entry.id !== id) };
         });
+
+        // Only call the API if this was a persisted (existing) record.
+        // Freshly added local-only entries use Date.now() as their id and
+        // were never saved, so there's nothing to delete on the server.
+        const isPersistedId = id < 10_000_000_000; // adjust threshold as needed, or track this explicitly
+        if (!isPersistedId) return;
+
+        try {
+          await axios.delete(`/api/experiences/${id}`, {
+            withCredentials: true,
+          });
+        } catch (err) {
+          console.error(`Failed to delete ${key} entry`, err);
+          alert("Something went wrong while deleting. Please try again.");
+          // Optionally: re-fetch or re-add the entry back to formData here,
+          // since the local state and DB are now out of sync.
+        }
       },
     };
   }
@@ -1886,6 +2019,7 @@ export default function ProfileTabs() {
                 entries={formData.experience}
                 errors={errors}
                 formData
+                setFormData={setFormData}
                 {...experienceHandlers}
               />
             )}

@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start"
   },
+   "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
     "@ckeditor/ckeditor5-react": "^11.2.0",
     "@prisma/adapter-mariadb": "^7.10.0",

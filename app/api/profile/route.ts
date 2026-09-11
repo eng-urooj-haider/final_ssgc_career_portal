@@ -50,6 +50,19 @@ export async function PATCH(req: NextRequest) {
   }
 
   // --- Experience tab (full replace) -------------------------------------
+  function parseFlexibleDate(value: unknown): Date | null {
+  if (!value || typeof value !== "string" || !value.trim()) return null;
+
+  // Try parsing as-is first (covers full ISO strings from the DB)
+  const direct = new Date(value);
+  if (!Number.isNaN(direct.getTime())) return direct;
+
+  // Fall back to YYYY-MM (from <input type="month">) by appending a day
+  const withDay = new Date(`${value}-01`);
+  if (!Number.isNaN(withDay.getTime())) return withDay;
+
+  return null;
+}
   if (body.experience) {
   await prisma.$transaction([
     prisma.experience.deleteMany({ where: { profile_id: profile.id } }),
@@ -60,8 +73,8 @@ export async function PATCH(req: NextRequest) {
         company: e.company,
         country: e.country || null,
         city: e.city || null,
-        start_date: new Date(`${e.start_date}-01`), // "2020-01" -> "2020-01-01"
-        end_date: e.end_date ? new Date(`${e.end_date}-01`) : null,
+        start_date: parseFlexibleDate(e.start_date), // "2020-01" -> "2020-01-01"
+        end_date: parseFlexibleDate(e.end_date),
         salary: e.salary || null,
         responsibility: e.responsibilities || null, // note: DB column is singular
         reason: e.reason || null,

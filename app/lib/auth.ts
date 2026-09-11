@@ -35,3 +35,4 @@ export function verifyToken(token: string): JwtPayload {
   const decoded = jwt.verify(token, jwtSecret) as JwtPayload;
   return decoded; // return the whole thing, not just userId
 }
+

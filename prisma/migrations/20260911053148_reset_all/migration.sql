@@ -99,8 +99,9 @@ CREATE TABLE `countries` (
 CREATE TABLE `Experience` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `profile_id` INTEGER NOT NULL,
-    `company` INTEGER NOT NULL,
-    `city` INTEGER NOT NULL,
+    `company` VARCHAR(191) NOT NULL,
+    `city` VARCHAR(191) NOT NULL,
+    `country` VARCHAR(191) NOT NULL,
     `start_date` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `end_date` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `salary` VARCHAR(191) NOT NULL,

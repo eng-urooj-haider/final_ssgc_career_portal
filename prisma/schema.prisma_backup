@@ -98,7 +98,6 @@ model Experience {
   id             Int      @id @default(autoincrement())
   profile_id     Int
   profile        Profile  @relation(fields: [profile_id], references: [id], onDelete: Cascade)
-  job_title      String
   company        String
   city           String
   country        String
