@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../app/generated/prisma"
@@ -12,101 +7,218 @@ datasource db {
   provider = "mysql"
 }
 
-model User {
-  id       Int      @id @default(autoincrement())
-  email    String   @unique
-  password String   @db.Text
-  role     String?
-  profile  Profile?
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+
+enum Role {
+  USER
+  ADMIN
+  RECRUITER
 }
 
-model Job {
-  id               Int      @id @default(autoincrement())
-  job_code         String   @unique
-  title            String
-  city             Json
-  publication_date DateTime
-  deadline         DateTime
-  age              Int?
-  qualification    String   @db.Text
-  skill            String?  @db.Text
-  responsibility   String?  @db.Text
-  special_info     String?  @db.Text
-  doc1_title       String?
-  doc1_attachment  String?
-  doc2_title       String?
-  doc2_attachment  String?
-  req1_doc_title   String?
-  req2_doc_title   String?
-  job_type         String
-  email            String?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+// -----------------------------------------------------------------------------
+// Models
+// -----------------------------------------------------------------------------
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique @db.VarChar(191)
+  password  String   @db.VarChar(255)
+  role      Role     @default(USER)
+  profile   Profile?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
 }
 
 model Profile {
-  id                   Int       @id @default(autoincrement())
-  user_id              Int       @unique
-  first_name           String?
-  last_name            String?
-  gender               String?
-  father_name          String?   @db.VarChar(100)
-  marital_status       String?   @db.VarChar(10)
-  children             String?   @db.VarChar(2)
-  date_of_birth        DateTime?
-  birth_country        String?
-  birth_city           String?
-  birth_city_other     String?
-  is_pakistani         String?   @db.VarChar(3)
-  cnic                 String?   @db.VarChar(100)
-  user_pic             String?
-  passport_no          String?   @db.VarChar(15)
-  domicile             String?   @db.VarChar(20)
-  mobile_prefix        String?   @db.VarChar(10)
-  mobile_number        String?   @db.VarChar(10)
-  home_prefix          String?   @db.VarChar(10)
-  home_number          String?   @db.VarChar(10)
-  office_prefix        String?   @db.VarChar(10)
-  office_number        String?   @db.VarChar(10)
-  current_address      String?   @db.TinyText
-  permanent_address    String?   @db.TinyText
-  already_worked_ssgc  String?   @db.VarChar(3)
-  ssgc_employee_name   String?   @db.VarChar(100)
-  ssgc_employee_number String?   @db.VarChar(10)
-  created_at           DateTime  @default(now())
-  updated_at           DateTime  @updatedAt
-  user                 User      @relation(fields: [user_id], references: [id])
-  experiences Experience[]
+  id                 Int            @id @default(autoincrement())
+  userId             Int            @unique @map("user_id")
+  firstName          String?        @map("first_name") @db.VarChar(100)
+  lastName           String?        @map("last_name") @db.VarChar(100)
+  gender             Gender?
+  fatherName         String?        @map("father_name") @db.VarChar(100)
+  maritalStatus      MaritalStatus? @map("marital_status")
+  childrenCount      Int?           @default(0) @map("children_count")
+  dateOfBirth        DateTime?      @map("date_of_birth") @db.Date
+  birthCountryId     Int?           @map("birth_country_id")
+  birthCityId        Int?           @map("birth_city_id")
+  birthCityOther     String?        @map("birth_city_other") @db.VarChar(100)
+  isPakistani        Boolean        @default(true) @map("is_pakistani")
+  cnic               String?        @map("cnic") @db.VarChar(20)
+  userPic            String?        @map("user_pic")
+  passportNo         String?        @map("passport_no") @db.VarChar(20)
+  domicile           String?        @map("domicile") @db.VarChar(50)
+  mobilePrefix       String?        @map("mobile_prefix") @db.VarChar(10)
+  mobileNumber       String?        @map("mobile_number") @db.VarChar(20)
+  homePrefix         String?        @map("home_prefix") @db.VarChar(10)
+  homeNumber         String?        @map("home_number") @db.VarChar(20)
+  officePrefix       String?        @map("office_prefix") @db.VarChar(10)
+  officeNumber       String?        @map("office_number") @db.VarChar(20)
+  currentAddress     String?        @map("current_address") @db.Text
+  permanentAddress   String?        @map("permanent_address") @db.Text
+  alreadyWorkedSsgc  Boolean        @default(false) @map("already_worked_ssgc")
+  ssgcEmployeeName   String?        @map("ssgc_employee_name") @db.VarChar(100)
+  ssgcEmployeeNumber String?        @map("ssgc_employee_number") @db.VarChar(20)
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experiences          Experience[]
+  qualificationDetails QualificationDetail[]
+
+  @@map("profiles")
 }
 
-model cities {
-  id         Int      @id @default(autoincrement())
-  city       String
-  province   String
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
+model Job {
+  id      Int    @id @default(autoincrement())
+  jobCode String @unique @map("job_code") @db.VarChar(50)
 
-model countries {
-  id         Int      @id @default(autoincrement())
-  country    String
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
+  title           String        @db.VarChar(150)
+  cities          Json? // Storing list of target cities as JSON array
+   publicationDate DateTime      @map("publication_date")
+  deadline        DateTime
+  maxAge          Int?          @map("max_age")
+  qualification   String        @db.Text
+  skill           String?       @db.Text
+  responsibility  String?       @db.Text
+  specialInfo     String?       @map("special_info") @db.Text
+  jobType         JobType       @map("job_type")
+  email           String?       @map("email") @db.VarChar(191)
+  doc1_title       String? @db.VarChar(150)
+  doc1_attachment  String? @db.VarChar(255)
+  doc2_title       String? @db.VarChar(150)
+  doc2_attachment  String? @db.VarChar(255)
+  req1_doc_title   String? @db.VarChar(150)
+  req2_doc_title   String? @db.VarChar(150)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  @@map("jobs")
 
+}
 model Experience {
-  id             Int      @id @default(autoincrement())
-  profile_id     Int
-  profile        Profile  @relation(fields: [profile_id], references: [id], onDelete: Cascade)
-  company        String
-  city           String
-  country        String
-  start_date     DateTime @default(now())
-  end_date       DateTime @default(now())
-  salary         String
-  responsibility String   @db.Text
-  reason         String   @db.Text
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
-   @@index([profile_id])
+  id             Int       @id @default(autoincrement())
+  profileId      Int       @map("profile_id")
+  jobTitle       String    @map("job_title") @db.VarChar(100)
+  company        String    @db.VarChar(150)
+  city           String    @db.VarChar(100)
+  country        String    @db.VarChar(100)
+  startDate      DateTime  @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  isCurrent      Boolean   @default(false) @map("is_current")
+  salary         Decimal?  @db.Decimal(12, 2)
+  responsibility String?   @db.Text
+  reasonForLeave String?   @map("reason_for_leave") @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@map("experiences")
+}
+
+model QualificationDetail {
+  id                   Int       @id @default(autoincrement())
+  profileId            Int       @map("profile_id")
+  qualificationGroupId Int?      @map("qualification_group_id")
+  qualificationId      Int?      @map("qualification_id")
+  institutionId        Int?      @map("institution_id")
+  groupOther           String?   @map("group_other") @db.VarChar(100)
+  qualificationOther   String?   @map("qualification_other") @db.VarChar(100)
+  institutionOther     String?   @map("institution_other") @db.VarChar(150)
+  country              String    @db.VarChar(100)
+  city                 String    @db.VarChar(100)
+  cityOther            String?   @map("city_other") @db.VarChar(100)
+  fromDate             DateTime  @map("from_date") @db.Date
+  toDate               DateTime? @map("to_date") @db.Date
+  documentPath         String?   @map("document_path") @db.VarChar(255)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  profile            Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  qualificationGroup QualificationGroup? @relation(fields: [qualificationGroupId], references: [id])
+  qualification      Qualification?      @relation(fields: [qualificationId], references: [id])
+  institution        Institution?        @relation(fields: [institutionId], references: [id])
+
+  @@index([profileId])
+  @@index([qualificationGroupId])
+  @@index([qualificationId])
+  @@map("qualification_details")
+}
+
+model QualificationGroup {
+  id                   Int                   @id @default(autoincrement())
+  groupName            String                @map("group_name") @db.VarChar(100)
+  qualifications       Qualification[]
+  qualificationDetails QualificationDetail[]
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  @@map("qualification_groups")
+}
+
+model Qualification {
+  id                   Int                   @id @default(autoincrement())
+  qualificationGroupId Int                   @map("qualification_group_id")
+  name                 String                @db.VarChar(150)
+  qualificationGroup   QualificationGroup    @relation(fields: [qualificationGroupId], references: [id], onDelete: Cascade)
+  qualificationDetails QualificationDetail[]
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  @@index([qualificationGroupId])
+  @@map("qualifications")
+}
+
+model Institution {
+  id                   Int                   @id @default(autoincrement())
+  name                 String                @db.VarChar(150)
+  qualificationDetails QualificationDetail[]
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  @@map("institutions")
+}
+
+model City {
+  id        Int      @id @default(autoincrement())
+  cityName  String   @map("city_name") @db.VarChar(100)
+  province  String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("cities")
+}
+
+model Country {
+  id          Int      @id @default(autoincrement())
+  countryName String   @map("country_name") @db.VarChar(100)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("countries")
 }
