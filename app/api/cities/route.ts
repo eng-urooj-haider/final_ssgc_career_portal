@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const cities = await prisma.cities.findMany();
+    const cities = await prisma.city.findMany();
 
     return NextResponse.json({
       cities,

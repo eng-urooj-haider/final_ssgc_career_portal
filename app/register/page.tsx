@@ -7,9 +7,9 @@ import { useRouter } from "next/navigation";
 interface RegisterCredentials {
   email: string;
   password: string;
-  confirmed_password: string;
-  first_name: string;
-  last_name: string;
+  confirmedPassword: string;
+  firstName: string;
+  lastName: string;
   gender: string;
   cnic: string;
 }
@@ -35,8 +35,8 @@ type FormErrors = Partial<Record<keyof RegisterCredentials, string>>;
 const RegisterUser = async (
   credential: RegisterCredentials,
 ): Promise<RegisterResponse> => {
-  // Don't send confirmed_password to the API — it's a client-side-only check
-  const { confirmed_password, ...payload } = credential;
+  // Don't send confirmedPassword to the API — it's a client-side-only check
+  const { confirmedPassword, ...payload } = credential;
   const response = await axios.post<RegisterResponse>(
     "/api/register",
     payload,
@@ -66,18 +66,18 @@ function validateField(
         return "Password must be 8+ characters with an uppercase letter, a lowercase letter, and a number.";
       return undefined;
 
-    case "confirmed_password":
+    case "confirmedPassword":
       if (!value) return "Please confirm your password.";
       if (value !== all.password) return "Passwords do not match.";
       return undefined;
 
-    case "first_name":
+    case "firstName":
       if (!value.trim()) return "First name is required.";
       if (value.trim().length < 2) return "First name is too short.";
       if (value.trim().length > 25) return "First name is too large.";
       return undefined;
 
-    case "last_name":
+    case "lastName":
       if (!value.trim()) return "Last name is required.";
       if (value.trim().length < 2) return "Last name is too short.";
       if (value.trim().length > 25) return "Last name is too large.";
@@ -113,9 +113,9 @@ export default function Page() {
   const [formDetail, setFormDetail] = useState<RegisterCredentials>({
     email: "",
     password: "",
-    confirmed_password: "",
-    first_name: "",
-    last_name: "",
+    confirmedPassword: "",
+    firstName: "",
+    lastName: "",
     gender: "",
     cnic: "",
   });
@@ -150,11 +150,11 @@ export default function Page() {
       setErrors((prev) => ({
         ...prev,
         [key]: validateField(key, value, updated),
-        ...(key === "password" && touched.confirmed_password
+        ...(key === "password" && touched.confirmedPassword
           ? {
-              confirmed_password: validateField(
-                "confirmed_password",
-                updated.confirmed_password,
+              confirmedPassword: validateField(
+                "confirmedPassword",
+                updated.confirmedPassword,
                 updated,
               ),
             }
@@ -183,9 +183,9 @@ export default function Page() {
     setTouched({
       email: true,
       password: true,
-      confirmed_password: true,
-      first_name: true,
-      last_name: true,
+      confirmedPassword: true,
+      firstName: true,
+      lastName: true,
       gender: true,
     });
 
@@ -291,23 +291,23 @@ export default function Page() {
             {/* Confirmed Password */}
             <div>
               <label
-                htmlFor="confirmed_password"
+                htmlFor="confirmedPassword"
                 className="mb-2 block text-sm font-medium text-[#333333]"
               >
                 Confirm Password
               </label>
               <div className="relative">
                 <input
-                  id="confirmed_password"
-                  name="confirmed_password"
+                  id="confirmedPassword"
+                  name="confirmedPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  value={formDetail.confirmed_password}
+                  value={formDetail.confirmedPassword}
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Re-enter your password"
-                  className={`${fieldClass(errors.confirmed_password)} pr-16`}
+                  className={`${fieldClass(errors.confirmedPassword)} pr-16`}
                   disabled={RegisterMutation.isPending}
-                  aria-invalid={!!errors.confirmed_password}
+                  aria-invalid={!!errors.confirmedPassword}
                 />
                 <button
                   type="button"
@@ -317,9 +317,9 @@ export default function Page() {
                   {showConfirmPassword ? "Hide" : "Show"}
                 </button>
               </div>
-              {errors.confirmed_password && (
+              {errors.confirmedPassword && (
                 <p className="mt-1 text-xs text-red-600">
-                  {errors.confirmed_password}
+                  {errors.confirmedPassword}
                 </p>
               )}
             </div>
@@ -327,50 +327,50 @@ export default function Page() {
             {/* First Name */}
             <div>
               <label
-                htmlFor="first_name"
+                htmlFor="firstName"
                 className="mb-2 block text-sm font-medium text-[#333333]"
               >
                 First Name
               </label>
               <input
-                id="first_name"
-                name="first_name"
+                id="firstName"
+                name="firstName"
                 type="text"
-                value={formDetail.first_name}
+                value={formDetail.firstName}
                 onChange={handleChange}
                 onBlur={handleBlur}
                 placeholder="Enter your first name"
-                className={fieldClass(errors.first_name)}
+                className={fieldClass(errors.firstName)}
                 disabled={RegisterMutation.isPending}
-                aria-invalid={!!errors.first_name}
+                aria-invalid={!!errors.firstName}
               />
-              {errors.first_name && (
-                <p className="mt-1 text-xs text-red-600">{errors.first_name}</p>
+              {errors.firstName && (
+                <p className="mt-1 text-xs text-red-600">{errors.firstName}</p>
               )}
             </div>
 
             {/* Last Name */}
             <div>
               <label
-                htmlFor="last_name"
+                htmlFor="lastName"
                 className="mb-2 block text-sm font-medium text-[#333333]"
               >
                 Last Name
               </label>
               <input
-                id="last_name"
-                name="last_name"
+                id="lastName"
+                name="lastName"
                 type="text"
-                value={formDetail.last_name}
+                value={formDetail.lastName}
                 onChange={handleChange}
                 onBlur={handleBlur}
                 placeholder="Enter your last name"
-                className={fieldClass(errors.last_name)}
+                className={fieldClass(errors.lastName)}
                 disabled={RegisterMutation.isPending}
-                aria-invalid={!!errors.last_name}
+                aria-invalid={!!errors.lastName}
               />
-              {errors.last_name && (
-                <p className="mt-1 text-xs text-red-600">{errors.last_name}</p>
+              {errors.lastName && (
+                <p className="mt-1 text-xs text-red-600">{errors.lastName}</p>
               )}
             </div>
 
@@ -393,8 +393,8 @@ export default function Page() {
                 aria-invalid={!!errors.gender}
               >
                 <option value="">Select Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+                <option value="MALE">MALE</option>
+                <option value="FEMALE">FEMALE</option>
               </select>
               {errors.gender && (
                 <p className="mt-1 text-xs text-red-600">{errors.gender}</p>
@@ -403,7 +403,7 @@ export default function Page() {
 
             <div>
               <label
-                htmlFor="last_name"
+                htmlFor="lastName"
                 className="mb-2 block text-sm font-medium text-[#333333]"
               >
                 CNIC

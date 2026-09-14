@@ -71,8 +71,12 @@ const TABS: TabDef[] = [
 const NAME_REGEX = /^[A-Za-z\s.'-]+$/;
 const CNIC_REGEX = /^\d{13}$/;
 // Local Pakistani dialing code, e.g. "021" (landline) or "0300" (mobile network).
+// NOTE: previously this required a leading "+" (e.g. "+92"), which could never
+// match the "03xx" placeholder or the 4-character maxLength on the input.
 const PREFIX_REGEX = /^0\d{2,3}$/;
 // 7-digit subscriber number that follows the mobile prefix (e.g. 0300-1234567).
+// Previously this required exactly 10 digits while the input was capped at
+// maxLength=7, so the field could never be filled in a way that validated.
 const MOBILE_REGEX = /^\d{7}$/;
 const LANDLINE_REGEX = /^\d{6,8}$/;
 const YEAR_REGEX = /^(19|20)\d{2}$/;
@@ -181,10 +185,7 @@ interface FormSelectFieldProps extends FieldProps {
   placeholder?: string;
   isLoading?: boolean;
 }
-
-// FIX: props were previously untyped (implicit `any`), which silently
-// swallowed type errors on every usage of this component.
-function FlameSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+function FlameSelect(props) {
   return (
     <select
       {...props}
@@ -438,6 +439,8 @@ interface PersonalFormData {
   birth_country: string;
   birth_city: string;
   birth_city_other: string;
+  // is_pakistani: string;
+  // cnic: string;
   passport_no: string;
   domicile: string;
   mobile_prefix: string;
@@ -457,8 +460,6 @@ interface PersonalTabProps {
   formData: PersonalFormData;
   onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   errors: Record<string, string>;
-  // FIX: this prop was used in the component body but never declared here.
-  setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
 
 function PersonalTab({
@@ -592,6 +593,34 @@ function PersonalTab({
             />
           </Field>
         )}
+
+        {/* <Field label="Is Pakistani?" required error={errors.is_pakistani}>
+          <select
+            name="is_pakistani"
+            value={formData.is_pakistani || ""}
+            onChange={onChange}
+            className="w-full rounded-md border border-gray-300 p-2 text-sm text-black"
+          >
+            <option value="">Select</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </Field> */}
+
+        {/* Only one of CNIC / Passport applies, depending on citizenship. */}
+        {/* {formData.is_pakistani === "Yes" && (
+          <Field label="CNIC" required error={errors.cnic}>
+            <FlameInput
+              name="cnic"
+              value={formData.cnic || ""}
+              onChange={onChange}
+              placeholder="0000000000000"
+              maxLength={13}
+              type="tel"
+              inputMode="numeric"
+            />
+          </Field>
+        )} */}
 
         <Field label="Passport Number" required error={errors.passport_no}>
           <FlameInput
@@ -859,6 +888,10 @@ function AddButton({ onClick, label }: AddButtonProps) {
 // Experience tab (lifted into shared state)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Experience tab (lifted into shared state)
+// ---------------------------------------------------------------------------
+
 interface ExperienceEntry {
   id: number;
   job_title: string;
@@ -895,8 +928,6 @@ interface ExperienceTabProps {
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
-  // FIX: this prop was used in the component body but never declared here.
-  setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
 
 function ExperienceTab({
@@ -907,6 +938,8 @@ function ExperienceTab({
   onRemove,
   errors,
 }: ExperienceTabProps) {
+  // Job location fields — this tab's own countries/cities lookups,
+  // deliberately separate from the Personal tab's birth country/city.
   const { data: experience } = useQuery({
     queryKey: ["experiences"],
     queryFn: GetExperiences,
@@ -981,6 +1014,55 @@ function ExperienceTab({
                 />
               </Field>
 
+              {/* <Field label="Country" error={errors[`${entry.id}_country`]}>
+                <select
+                  value={entry.country || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "country", e.target.value)
+                  }
+                  disabled={isLoadingCountries}
+                  className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
+                >
+                  <option value="">
+                    {isLoadingCountries
+                      ? "Loading countries..."
+                      : "Select country"}
+                  </option>
+                  {countriesError && (
+                    <option disabled>Failed to load countries</option>
+                  )}
+                  {countries?.map(
+                    (country: { id: number; country: string }) => (
+                      <option key={country.id} value={country.country}>
+                        {country.country}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </Field>
+
+              <Field label="City" error={errors[`${entry.id}_city`]}>
+                <select
+                  value={entry.city || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "city", e.target.value)
+                  }
+                  disabled={isLoadingCities}
+                  className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
+                >
+                  <option value="">
+                    {isLoadingCities ? "Loading cities..." : "Select city"}
+                  </option>
+                  {citiesError && (
+                    <option disabled>Failed to load cities</option>
+                  )}
+                  {cities?.map((city: { id: number; city: string }) => (
+                    <option key={city.id} value={city.city}>
+                      {city.city}
+                    </option>
+                  ))}
+                </select>
+              </Field> */}
               <LocationSelects
                 required
                 countryName={`experience[${entry.id}].country`}
@@ -1094,6 +1176,10 @@ export interface EducationEntry {
   total_marks_gpa: string;
 }
 
+// ---------------------------------------------------------------------------
+// Education Types & Validation
+// ---------------------------------------------------------------------------
+
 export const emptyEducation = (id: number): EducationEntry => ({
   id,
   qualification_group_id: "",
@@ -1113,6 +1199,10 @@ export const emptyEducation = (id: number): EducationEntry => ({
   division_grade: "",
   total_marks_gpa: "",
 });
+
+// ---------------------------------------------------------------------------
+// Education Single Row Component (Handles Dynamic Qualification Lookup)
+// ---------------------------------------------------------------------------
 
 interface EducationRowProps {
   entry: EducationEntry;
@@ -1141,6 +1231,8 @@ function EducationRow({
   isLoadingGroups,
   isLoadingInstitutes,
 }: EducationRowProps) {
+  console.log("errorsss", errors);
+  // Dynamic fetch for specific qualifications based on chosen group
   const { data: qualifications = [], isLoading: isLoadingQualifications } =
     useQuery({
       queryKey: ["qualifications", entry.qualification_group_id],
@@ -1254,16 +1346,11 @@ function EducationRow({
           onCountryChange={(e) =>
             onFieldChange(entry.id, "country", e.target.value)
           }
-          // FIX: this previously called onFieldChange(entry.id, "country", ...)
-          // so selecting a city silently overwrote the country field instead.
           onCityChange={(e) =>
-            onFieldChange(entry.id, "city", e.target.value)
+            onFieldChange(entry.id, "country", e.target.value)
           }
-          // FIX: these read the flat `errors.country` / `errors.city` keys,
-          // but validate() stores per-row errors as `${entry.id}_country` /
-          // `${entry.id}_city`, so the messages never rendered.
-          countryError={errors[`${entry.id}_country`]}
-          cityError={errors[`${entry.id}_city`]}
+          countryError={errors.country}
+          cityError={errors.city}
         />
 
         <Field
@@ -1340,6 +1427,10 @@ function EducationRow({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Main Education Tab Container Component
+// ---------------------------------------------------------------------------
+
 interface EducationTabProps {
   entries: EducationEntry[];
   onFieldChange: (
@@ -1361,6 +1452,8 @@ export function EducationTab({
   setFormData,
   errors,
 }: EducationTabProps) {
+  console.log("bbbbbbb", errors);
+  // Fetch Shared Dropdown Data
   const { data: qualificationGroups = [], isLoading: isLoadingGroups } =
     useQuery({
       queryKey: ["qualificationGroups"],
@@ -1374,6 +1467,7 @@ export function EducationTab({
     staleTime: 1000 * 60 * 60,
   });
 
+  // Fetch Existing User Education Profile Data
   const { data: profileEducation } = useQuery({
     queryKey: ["user_education"],
     queryFn: async () => {
@@ -1395,11 +1489,6 @@ export function EducationTab({
           institute_id: String(edu.institute_id ?? ""),
           institute_other: edu.institute_other ?? "",
           major_subject: edu.major_subject ?? "",
-          // FIX: country/city were previously dropped when reloading a
-          // saved profile, silently clearing fields that had been filled in.
-          country: edu.country ?? "",
-          city: edu.city ?? "",
-          city_other: edu.city_other ?? "",
           passing_year: String(edu.passing_year ?? ""),
           obtained_marks_gpa: String(edu.obtained_marks_gpa ?? ""),
           total_marks_gpa: String(edu.total_marks_gpa ?? ""),
@@ -1447,9 +1536,6 @@ interface CertificateEntry {
   name: string;
   organisation: string;
   document_name: string;
-  // FIX: the actual File object is stored under this key when uploading,
-  // but it was previously missing from the type entirely.
-  document?: File | null;
   issue_date: string;
 }
 
@@ -1458,7 +1544,6 @@ const emptyCertificate = (id: number): CertificateEntry => ({
   name: "",
   organisation: "",
   document_name: "",
-  document: null,
   issue_date: "",
 });
 
@@ -1495,6 +1580,7 @@ function CertificatesTab({
             removeDisabled={entries.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
+              {/* Certification Name */}
               <Field
                 label="Certification Name"
                 required
@@ -1509,6 +1595,7 @@ function CertificatesTab({
                 />
               </Field>
 
+              {/* Issuing Organisation */}
               <Field
                 label="Issuing Organisation"
                 required
@@ -1523,6 +1610,7 @@ function CertificatesTab({
                 />
               </Field>
 
+              {/* Issue Date */}
               <Field
                 label="Issue Date"
                 required
@@ -1536,7 +1624,35 @@ function CertificatesTab({
                   }
                 />
               </Field>
+              {/* <Field
+                label="End Date"
+                required
+                error={errors[`${entry.id}_end_date`]}
+              >
+                <FlameInput
+                  type="date"
+                  value={entry.end_date || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "end_date", e.target.value)
+                  }
+                />
+              </Field> */}
 
+              {/* Credential ID */}
+              {/* <Field
+                label="Credential ID"
+                error={errors[`${entry.id}_credential_id`]}
+              >
+                <FlameInput
+                  value={entry.credential_id || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "credential_id", e.target.value)
+                  }
+                  placeholder="e.g. ABC-12345678"
+                />
+              </Field> */}
+
+              {/* Attach Document Option */}
               <Field
                 label="Attach Document"
                 error={errors[`${entry.id}_document`]}
@@ -1555,10 +1671,7 @@ function CertificatesTab({
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null;
-                        // FIX: this previously wrote the File object to
-                        // "document_name" and then immediately overwrote it
-                        // with the filename, so the File was never kept.
-                        onFieldChange(entry.id, "document", file);
+                        onFieldChange(entry.id, "document_name", file);
                         onFieldChange(
                           entry.id,
                           "document_name",
@@ -1568,6 +1681,7 @@ function CertificatesTab({
                     />
                   </label>
 
+                  {/* Remove Attached Document Button */}
                   {(entry.document || entry.document_name) && (
                     <button
                       type="button"
@@ -1682,6 +1796,18 @@ function MembershipsTab({
                   }
                 />
               </Field>
+              {/* <Field
+                label="Membership ID"
+                error={errors[`${entry.id}_membership_id`]}
+              >
+                <FlameInput
+                  value={entry.membership_id}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "membership_id", e.target.value)
+                  }
+                  placeholder="Optional"
+                />
+              </Field> */}
             </div>
           </RepeatableCard>
         ))}
@@ -1714,6 +1840,8 @@ const initialFormData: ProfileFormData = {
   birth_country: "",
   birth_city: "",
   birth_city_other: "",
+  // is_pakistani: "",
+  // cnic: "",
   passport_no: "",
   domicile: "",
   mobile_prefix: "",
@@ -1797,6 +1925,23 @@ export default function ProfileTabs() {
       ) {
         newErrors.birth_city_other = "Please specify your birth city";
       }
+
+      // if (!formData.is_pakistani) {
+      //   newErrors.is_pakistani = "Please select an option";
+      // }
+
+      // CNIC and passport are mutually exclusive, based on citizenship.
+      // if (formData.is_pakistani === "Yes") {
+      //   if (!formData.cnic?.trim()) {
+      //     newErrors.cnic = "CNIC is required";
+      //   } else if (!CNIC_REGEX.test(formData.cnic.trim())) {
+      //     newErrors.cnic = "CNIC must be exactly 13 digits";
+      //   }
+      // } else if (formData.is_pakistani === "No") {
+      //   if (!formData.passport_no?.trim()) {
+      //     newErrors.passport_no = "Passport number is required";
+      //   }
+      // }
 
       const domicile = formData.domicile?.trim() || "";
       if (!domicile) {
@@ -1929,17 +2074,20 @@ export default function ProfileTabs() {
       } else {
         formData.education.forEach((entry, index) => {
           const keyPrefix = `${entry.id ?? index}_`;
-
+          console.log(entry.id);
+          // Qualification Level
           if (!getSafeString(entry.qualification_group_id)) {
             newErrors[`${keyPrefix}qualification_group_id`] =
               "Qualification level is required";
           }
 
+          // Degree / Qualification
           if (!getSafeString(entry.qualification_id)) {
             newErrors[`${keyPrefix}qualification_id`] =
               "Degree/Qualification is required";
           }
 
+          // Institute
           const instituteIdStr = getSafeString(entry.institute_id);
 
           if (!instituteIdStr) {
@@ -1953,19 +2101,23 @@ export default function ProfileTabs() {
               "Please specify institute name";
           }
 
+          // Major Subject
           if (!getSafeString(entry.major_subject)) {
             newErrors[`${keyPrefix}major_subject`] =
               "Major subject / Specialization is required";
           }
 
+          // Country
           if (!getSafeString(entry.country)) {
             newErrors[`${keyPrefix}country`] = "Country is required";
           }
 
+          // City
           if (!getSafeString(entry.city)) {
             newErrors[`${keyPrefix}city`] = "City is required";
           }
 
+          // Passing Year
           const passingYearStr = getSafeString(entry.passing_year);
 
           if (!passingYearStr) {
@@ -1982,6 +2134,7 @@ export default function ProfileTabs() {
             }
           }
 
+          // Obtained marks / GPA
           const obtainedStr = getSafeString(entry.obtained_marks_gpa);
           const obtainedNum = parseFloat(obtainedStr);
 
@@ -1993,6 +2146,7 @@ export default function ProfileTabs() {
               "Enter a valid positive number";
           }
 
+          // Total marks / GPA
           const totalStr = getSafeString(entry.total_marks_gpa);
           const totalNum = parseFloat(totalStr);
 
@@ -2004,6 +2158,7 @@ export default function ProfileTabs() {
               "Total marks/CGPA must be greater than 0";
           }
 
+          // Obtained cannot exceed total
           if (
             obtainedStr &&
             totalStr &&
@@ -2017,6 +2172,7 @@ export default function ProfileTabs() {
               "Obtained cannot exceed total";
           }
 
+          // Division / Grade
           if (!getSafeString(entry.division_grade)) {
             newErrors[`${keyPrefix}division_grade`] =
               "Division / Grade is required";
@@ -2038,10 +2194,7 @@ export default function ProfileTabs() {
           newErrors[`${entry.id}_issue_date`] = "Issue date is required";
         }
         if (!entry.document_name) {
-          // FIX: this previously wrote to `${entry.id}_issue_date`, which
-          // clobbered any real issue-date error and never showed under the
-          // document field (which reads `${entry.id}_document`).
-          newErrors[`${entry.id}_document`] = "Document is required";
+          newErrors[`${entry.id}_issue_date`] = "Document is required";
         }
       });
     }
@@ -2062,6 +2215,7 @@ export default function ProfileTabs() {
     }
 
     setErrors(newErrors);
+    console.log("jijoijoi", newErrors);
     return Object.keys(newErrors).length === 0;
   }
 
@@ -2069,6 +2223,7 @@ export default function ProfileTabs() {
   // from pasting/typing letters into a phone number in the first place,
   // rather than only flagging it after they hit Save.
   const DIGITS_ONLY_FIELDS = new Set([
+    // "cnic",
     "mobile_prefix",
     "mobile_number",
     "home_prefix",
@@ -2101,6 +2256,12 @@ export default function ProfileTabs() {
       if (name === "birth_city" && value !== "other") {
         updated.birth_city_other = "";
       }
+      // if (name === "is_pakistani" && value === "Yes") {
+      //   updated.passport_no = "";
+      // }
+      // if (name === "is_pakistani" && value === "No") {
+      //   updated.cnic = "";
+      // }
       if (name === "already_worked_ssgc" && value !== "Yes") {
         updated.ssgc_employee_name = "";
         updated.ssgc_employee_number = "";
@@ -2109,7 +2270,10 @@ export default function ProfileTabs() {
     });
     setErrors((prev) => {
       if (!prev[name]) {
-        if (name === "already_worked_ssgc") {
+        // Even if this exact field has no error, switching is_pakistani or
+        // already_worked_ssgc can invalidate errors on dependent fields
+        // (cnic/passport_no, ssgc_employee_name/number) — clear those too.
+        if (name === "is_pakistani" || name === "already_worked_ssgc") {
           const dependentKeys = ["ssgc_employee_name", "ssgc_employee_number"];
           const hasDependentError = dependentKeys.some((k) => prev[k]);
           if (!hasDependentError) return prev;
@@ -2133,19 +2297,6 @@ export default function ProfileTabs() {
   }
 
   // Generic helpers for the four repeatable-entry tabs -----------------------
-
-  // FIX: previously always hit "/api/experiences/${id}" regardless of which
-  // tab's entry was being deleted, so removing a saved education,
-  // certificate, or membership record never actually deleted it server-side.
-  const DELETE_ENDPOINTS: Record<
-    "experience" | "education" | "certificates" | "memberships",
-    string
-  > = {
-    experience: "/api/experiences",
-    education: "/api/education",
-    certificates: "/api/certificates",
-    memberships: "/api/memberships",
-  };
 
   function makeEntryHandlers<
     K extends "experience" | "education" | "certificates" | "memberships",
@@ -2195,7 +2346,7 @@ export default function ProfileTabs() {
         if (!isPersistedId) return;
 
         try {
-          await axios.delete(`${DELETE_ENDPOINTS[key]}/${id}`, {
+          await axios.delete(`/api/experiences/${id}`, {
             withCredentials: true,
           });
         } catch (err) {
