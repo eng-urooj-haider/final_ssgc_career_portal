@@ -29,6 +29,7 @@ import {
   getQualifications,
 } from "@/app/lib/dashboard";
 import { useQuery } from "@tanstack/react-query";
+import useUserProfile from "@/app/lib/fetchUserProfile";
 
 type TabId =
   | "photo"
@@ -221,6 +222,11 @@ function FormSelectField({
             {opt.label}
           </option>
         ))}
+        {label !== "Country" && (
+          <option key="other" value="other">
+            Other
+          </option>
+        )}
       </FlameSelect>
     </Field>
   );
@@ -271,13 +277,13 @@ function LocationSelects({
   const countryOptions = countries.map(
     (c: { id: number; countryName: string }) => ({
       label: c.countryName,
-      value: c.countryName,
+      value: c.id,
     }),
   );
 
   const cityOptions = cities.map((c: { id: number; cityName: string }) => ({
     label: c.cityName,
-    value: c.cityName,
+    value: c.id,
   }));
 
   return (
@@ -334,26 +340,29 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
     }
   }
 
-  const fetchUserProfile = async () => {
-    const res = await axios.get("/api/user_profile", { withCredentials: true });
-    return res.data.profile;
-  };
+  // const fetchUserProfile = async () => {
+  //   const res = await axios.get("/api/user_profile", { withCredentials: true });
+  //   return res.data.profile;
+  // };
 
+  // const {
+  //   data: profile,
+  //   isLoading: isLoadingProfile,
+  //   isError: isProfileError,
+  // } = useQuery({
+  //   queryKey: ["profile_pic"],
+  //   queryFn: fetchUserProfile,
+  // });
   const {
     data: profile,
     isLoading: isLoadingProfile,
     isError: isProfileError,
-  } = useQuery({
-    queryKey: ["profile_pic"],
-    queryFn: fetchUserProfile,
-  });
-
+  } = useUserProfile();
   React.useEffect(() => {
-    if (profile?.user_pic && !hasLocalSelection) {
-      setPreview(profile.user_pic);
+    if (profile?.userPic && !hasLocalSelection) {
+      setPreview(profile.userPic);
     }
   }, [profile, hasLocalSelection]);
-
   React.useEffect(() => {
     return () => {
       if (preview?.startsWith("blob:")) {
@@ -413,11 +422,11 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
                 Loading current photo…
               </p>
             )}
-            {isProfileError && !hasLocalSelection && (
+            {/* {isProfileError && !hasLocalSelection && (
               <p className="mt-1 text-xs text-red-400">
                 Couldn't load your current photo.
               </p>
-            )}
+            )} */}
           </div>
         </div>
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
@@ -467,42 +476,40 @@ function PersonalTab({
   errors,
   setFormData,
 }: PersonalTabProps) {
-  const fetchUserProfile = async () => {
-    const res = await axios.get("/api/user_profile", { withCredentials: true });
-    return res.data.profile;
-  };
+  // const fetchUserProfile = async () => {
+  //   const res = await axios.get("/api/user_profile", { withCredentials: true });
+  //   return res.data.profile;
+  // };
   const {
     data: profile,
     isLoading: isLoadingProfile,
     isError: isProfileError,
-  } = useQuery({
-    queryKey: ["profile_data"],
-    queryFn: fetchUserProfile,
-  });
+  } = useUserProfile();
+
   React.useEffect(() => {
     if (profile) {
       setFormData((prev) => ({
         ...prev,
-        father_name: profile.father_name ?? "",
-        marital_status: profile.marital_status ?? "",
-        children: profile.children ?? "",
-        date_of_birth: profile.date_of_birth ?? "",
-        birth_country: profile.birth_country ?? "",
-        birth_city: profile.birth_city ?? "",
-        birth_city_other: profile.birth_city_other ?? "",
-        passport_no: profile.passport_no ?? "",
+        father_name: profile.fatherName ?? "",
+        marital_status: profile.maritalStatus ?? "",
+        children: profile.childrenCount ?? 0,
+        date_of_birth: profile.dateOfBirth ?? "",
+        birth_country: profile.birthCountryId ?? "",
+        birth_city: profile.birthCityId ?? "",
+        birth_city_other: profile.birthCityOther ?? "",
+        passport_no: profile.passportNo ?? "",
         domicile: profile.domicile ?? "",
-        mobile_prefix: profile.mobile_prefix ?? "",
-        mobile_number: profile.mobile_number ?? "",
-        home_prefix: profile.home_prefix ?? "",
-        home_number: profile.home_number ?? "",
-        office_prefix: profile.office_prefix ?? "",
-        office_number: profile.office_number ?? "",
-        current_address: profile.current_address ?? "",
-        permanent_address: profile.permanent_address ?? "",
-        already_worked_ssgc: profile.already_worked_ssgc ?? "",
-        ssgc_employee_name: profile.ssgc_employee_name ?? "",
-        ssgc_employee_number: profile.ssgc_employee_number ?? "",
+        mobile_prefix: profile.mobilePrefix ?? "",
+        mobile_number: profile.mobileNumber ?? "",
+        home_prefix: profile.homePrefix ?? "",
+        home_number: profile.homeNumber ?? "",
+        office_prefix: profile.officePrefix ?? "",
+        office_number: profile.officeNumber ?? "",
+        current_address: profile.currentAddress ?? "",
+        permanent_address: profile.permanentAddress ?? "",
+        already_worked_ssgc: profile.alreadyWorkedSsgc == true ? "Yes" : "No",
+        ssgc_employee_name: profile.ssgcEmployeeName ?? "",
+        ssgc_employee_number: profile.ssgcEmployeeNumber ?? "",
       }));
     }
   }, [profile]);
@@ -535,16 +542,15 @@ function PersonalTab({
             className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
           >
             <option value="">Select status</option>
-            <option value="Single">Single</option>
-            <option value="Married">Married</option>
-            <option value="Other">Other</option>
+            <option value="SINGLE">Single</option>
+            <option value="MARRIED">Married</option>
           </select>
         </Field>
 
         <Field label="No. of Children" required error={errors.children}>
           <select
             name="children"
-            value={formData.children || ""}
+            value={formData.children || 0}
             onChange={onChange}
             className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
           >
@@ -870,6 +876,7 @@ interface ExperienceEntry {
   salary: string;
   responsibilities: string;
   reason: string;
+  city_other: string;
 }
 
 const emptyExperience = (id: number): ExperienceEntry => ({
@@ -883,6 +890,7 @@ const emptyExperience = (id: number): ExperienceEntry => ({
   salary: "",
   responsibilities: "",
   reason: "",
+  city_other: "",
 });
 
 interface ExperienceTabProps {
@@ -907,10 +915,8 @@ function ExperienceTab({
   onRemove,
   errors,
 }: ExperienceTabProps) {
-  const { data: experience } = useQuery({
-    queryKey: ["experiences"],
-    queryFn: GetExperiences,
-  });
+  const { data: profile } = useUserProfile();
+  const experience = profile.experiences;
   function toMonthInput(date: string | Date | null | undefined): string {
     if (!date) return "";
     const d = new Date(date);
@@ -926,15 +932,16 @@ function ExperienceTab({
         ...prev,
         experience: experience.map((exp: any, index: number) => ({
           id: exp.id ?? index + 1,
-          job_title: exp.job_title ?? "",
+          job_title: exp.jobTitle ?? "",
           company: exp.company ?? "",
           country: exp.country ?? "",
           city: exp.city ?? "",
-          start_date: toMonthInput(exp.start_date ?? ""),
-          end_date: toMonthInput(exp.end_date ?? ""),
+          start_date: toMonthInput(exp.startDate ?? ""),
+          end_date: toMonthInput(exp.endDate ?? ""),
           salary: exp.salary ?? "",
           responsibilities: exp.responsibility ?? "",
-          reason: exp.reason ?? "",
+          reason: exp.reasonForLeave ?? "",
+          city_other: exp.cityOther ?? "",
         })),
       }));
     }
@@ -996,6 +1003,18 @@ function ExperienceTab({
                 countryError={errors[`${entry.id}_country`]}
                 cityError={errors[`${entry.id}_city`]}
               />
+              {entry.city === "other" && (
+                <Field label="City (Other)" required error={errors.city_other}>
+                  <FlameInput
+                    name="city_other"
+                    value={entry.city_other || ""}
+                    onChange={(e) =>
+                      onFieldChange(entry.id, "city_other", e.target.value)
+                    }
+                    placeholder="Enter your city"
+                  />
+                </Field>
+              )}
 
               <Field
                 label="Start date"
@@ -1150,7 +1169,7 @@ function EducationRow({
     });
 
   const groupOptions = qualificationGroups.map((g: any) => ({
-    label: g.name || g.title,
+    label: g.groupName || g.title,
     value: g.id,
   }));
 
@@ -1256,9 +1275,7 @@ function EducationRow({
           }
           // FIX: this previously called onFieldChange(entry.id, "country", ...)
           // so selecting a city silently overwrote the country field instead.
-          onCityChange={(e) =>
-            onFieldChange(entry.id, "city", e.target.value)
-          }
+          onCityChange={(e) => onFieldChange(entry.id, "city", e.target.value)}
           // FIX: these read the flat `errors.country` / `errors.city` keys,
           // but validate() stores per-row errors as `${entry.id}_country` /
           // `${entry.id}_city`, so the messages never rendered.
@@ -1374,15 +1391,8 @@ export function EducationTab({
     staleTime: 1000 * 60 * 60,
   });
 
-  const { data: profileEducation } = useQuery({
-    queryKey: ["user_education"],
-    queryFn: async () => {
-      const res = await axios.get("/api/user_education", {
-        withCredentials: true,
-      });
-      return res.data.education;
-    },
-  });
+  const { data: profile } = useUserProfile();
+  const profileEducation = profile.education;
 
   React.useEffect(() => {
     if (profileEducation && profileEducation.length > 0) {
@@ -1390,20 +1400,20 @@ export function EducationTab({
         ...prev,
         education: profileEducation.map((edu: any, index: number) => ({
           id: edu.id ?? index + 1,
-          qualification_group_id: String(edu.qualification_group_id ?? ""),
-          qualification_id: String(edu.qualification_id ?? ""),
-          institute_id: String(edu.institute_id ?? ""),
-          institute_other: edu.institute_other ?? "",
-          major_subject: edu.major_subject ?? "",
+          qualification_group_id: String(edu.qualificationGroupId ?? ""),
+          qualification_id: String(edu.qualificationId ?? ""),
+          institute_id: String(edu.institutionId ?? ""),
+          institute_other: edu.instituteOther ?? "",
+          major_subject: edu.majorSubject ?? "",
           // FIX: country/city were previously dropped when reloading a
           // saved profile, silently clearing fields that had been filled in.
-          country: edu.country ?? "",
-          city: edu.city ?? "",
-          city_other: edu.city_other ?? "",
-          passing_year: String(edu.passing_year ?? ""),
-          obtained_marks_gpa: String(edu.obtained_marks_gpa ?? ""),
-          total_marks_gpa: String(edu.total_marks_gpa ?? ""),
-          division_grade: edu.division_grade ?? "",
+          country: edu.countryId ?? "",
+          city: edu.cityId ?? "",
+          city_other: edu.cityOther ?? "",
+          passing_year: String(edu.passingYear ?? ""),
+          obtained_marks_gpa: String(edu.obtainedMarks ?? ""),
+          total_marks_gpa: String(edu.totalMarks ?? ""),
+          division_grade: edu.divisionGrade ?? "",
         })),
       }));
     }
@@ -1630,7 +1640,24 @@ function MembershipsTab({
   onAdd,
   onRemove,
   errors,
+  setFormData
 }: MembershipsTabProps) {
+  const { data: profile } = useUserProfile();
+  const memberships = profile.membership;
+  React.useEffect(() => {
+    if (memberships && memberships.length > 0) {
+      setFormData((prev: any) => ({
+        ...prev,
+        membership: memberships.map((edu: any, index: number) => ({
+          id: edu.id ?? index + 1,
+          membership_type: edu.membershipType ?? "",
+          organisation: edu.organisation ?? "",
+          member_since: edu.memberSince ?? "",
+        })),
+      }));
+    }
+  }, [memberships, setFormData]);
+  console.log(entries)
   return (
     <div>
       <SectionHeading
@@ -1911,6 +1938,9 @@ export default function ProfileTabs() {
         }
         if (!entry.reason) {
           newErrors[`${entry.id}_reason`] = "Reason is required";
+        }
+        if (entry.city === "other" && !entry.city_other?.trim()) {
+          newErrors.city_other = "Please specify your experience city";
         }
       });
     }
@@ -2235,7 +2265,7 @@ export default function ProfileTabs() {
           }
           const photoPayload = new FormData();
           photoPayload.append("pic", formData.image);
-          await axios.post("/api/profile", photoPayload, {
+          await axios.post("/api/user_profile", photoPayload, {
             withCredentials: true,
           });
           break;
@@ -2413,6 +2443,7 @@ export default function ProfileTabs() {
               <ExperienceTab
                 entries={formData.experience}
                 errors={errors}
+                setFormData={setFormData}
                 {...experienceHandlers}
               />
             )}
@@ -2420,6 +2451,7 @@ export default function ProfileTabs() {
               <EducationTab
                 entries={formData.education}
                 errors={errors}
+                setFormData={setFormData}
                 {...educationHandlers}
               />
             )}
@@ -2434,6 +2466,7 @@ export default function ProfileTabs() {
               <MembershipsTab
                 entries={formData.memberships}
                 errors={errors}
+                setFormData={setFormData}
                 {...membershipsHandlers}
               />
             )}

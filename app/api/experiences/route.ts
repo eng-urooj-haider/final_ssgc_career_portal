@@ -24,7 +24,7 @@ export const GET = async (req: NextRequest) => {
 
     const profile = await prisma.profile.findFirst({
       where: {
-        user_id: userId,
+        userId: userId,
       },
     });
 
@@ -34,7 +34,7 @@ export const GET = async (req: NextRequest) => {
 
     const experiences = await prisma.experience.findMany({
       where: {
-        profile_id: profile.id,
+        profileId: profile.id,
       },
     });
 
@@ -75,7 +75,7 @@ export const DELETE = async (
     }
 
     // const profile = await prisma.profile.findFirst({
-    //   where: { user_id: decoded.userId },
+    //   where: { userId: decoded.userId },
     // });
 
     // if (!profile) {

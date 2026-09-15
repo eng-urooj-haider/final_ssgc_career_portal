@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/lib/db";
 import { verifyToken } from "@/app/lib/auth";
+function parseSafeBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
 
+  if (typeof value === "string") {
+    const sanitized = value.trim().toUpperCase();
+    return sanitized === "YES" || sanitized === "TRUE" || sanitized === "1";
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  return false;
+}
 export async function PATCH(req: NextRequest) {
- const token = req.cookies.get("token")?.value;
+  const token = req.cookies.get("token")?.value;
   const decode = await verifyToken(token);
-  const userId = decode.userId
+  const userId = decode.userId;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -13,37 +26,42 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json();
 
   // Make sure a Profile row exists for this user before touching child tables.
- const profile = await prisma.profile.upsert({
-  where: { user_id: userId },
-  update: {},
-  create: { user_id: userId },
-});
+  const profile = await prisma.profile.upsert({
+    where: { userId: userId },
+    update: {},
+    create: { userId: userId },
+  });
 
   // --- Personal details tab ---------------------------------------------
-  if (!body.experience && !body.education && !body.certificates && !body.memberships) {
+  if (
+    !body.experience &&
+    !body.education &&
+    !body.certificates &&
+    !body.memberships
+  ) {
     const updated = await prisma.profile.update({
       where: { id: profile.id },
       data: {
-        father_name: body.father_name,
-        marital_status: body.marital_status,
-        children: body.children,
-        date_of_birth: body.date_of_birth ? new Date(body.date_of_birth) : null,
-        birth_country: body.birth_country,
-        birth_city: body.birth_city,
-        birth_city_other: body.birth_city_other,
-        passport_no: body.passport_no,
+        fatherName: body.father_name,
+        maritalStatus: body.marital_status,
+        childrenCount: parseInt(body.children),
+        dateOfBirth: body.date_of_birth ? new Date(body.date_of_birth) : null,
+        birthCountryId: parseInt(body.birth_country),
+        birthCityId: parseInt(body.birth_city),
+        birthCityOther: body.birth_city_other,
+        passportNo: body.passport_no,
         domicile: body.domicile,
-        mobile_prefix: body.mobile_prefix,
-        mobile_number: body.mobile_number,
-        home_prefix: body.home_prefix,
-        home_number: body.home_number,
-        office_prefix: body.office_prefix,
-        office_number: body.office_number,
-        current_address: body.current_address,
-        permanent_address: body.permanent_address,
-        already_worked_ssgc: body.already_worked_ssgc,
-        ssgc_employee_name: body.ssgc_employee_name,
-        ssgc_employee_number: body.ssgc_employee_number,
+        mobilePrefix: body.mobile_prefix,
+        mobileNumber: body.mobile_number,
+        homePrefix: body.home_prefix,
+        homeNumber: body.home_number,
+        officePrefix: body.office_prefix,
+        officeNumber: body.office_number,
+        currentAddress: body.current_address,
+        permanentAddress: body.permanent_address,
+        alreadyWorkedSsgc: parseSafeBoolean(body.already_worked_ssgc),
+        ssgcEmployeeName: body.ssgc_employee_name,
+        ssgcEmployeeNumber: body.ssgc_employee_number,
       },
     });
     return NextResponse.json({ profile: updated });
@@ -51,89 +69,108 @@ export async function PATCH(req: NextRequest) {
 
   // --- Experience tab (full replace) -------------------------------------
   function parseFlexibleDate(value: unknown): Date | null {
-  if (!value || typeof value !== "string" || !value.trim()) return null;
+    if (!value || typeof value !== "string" || !value.trim()) return null;
 
-  // Try parsing as-is first (covers full ISO strings from the DB)
-  const direct = new Date(value);
-  if (!Number.isNaN(direct.getTime())) return direct;
+    // Try parsing as-is first (covers full ISO strings from the DB)
+    const direct = new Date(value);
+    if (!Number.isNaN(direct.getTime())) return direct;
 
-  // Fall back to YYYY-MM (from <input type="month">) by appending a day
-  const withDay = new Date(`${value}-01`);
-  if (!Number.isNaN(withDay.getTime())) return withDay;
+    // Fall back to YYYY-MM (from <input type="month">) by appending a day
+    const withDay = new Date(`${value}-01`);
+    if (!Number.isNaN(withDay.getTime())) return withDay;
 
-  return null;
-}
+    return null;
+  }
   if (body.experience) {
-  await prisma.$transaction([
-    prisma.experience.deleteMany({ where: { profile_id: profile.id } }),
-    prisma.experience.createMany({
-      data: body.experience.map((e: any) => ({
-        profile_id: profile.id,
-        job_title: e.job_title,
-        company: e.company,
-        country: e.country || null,
-        city: e.city || null,
-        start_date: parseFlexibleDate(e.start_date), // "2020-01" -> "2020-01-01"
-        end_date: parseFlexibleDate(e.end_date),
-        salary: e.salary || null,
-        responsibility: e.responsibilities || null, // note: DB column is singular
-        reason: e.reason || null,
-      })),
-    }),
-  ]);
-  return NextResponse.json({ ok: true });
-}
+    await prisma.$transaction([
+      prisma.experience.deleteMany({ where: { profileId: profile.id } }),
+      prisma.experience.createMany({
+        data: body.experience.map((e: any) => ({
+          profileId: profile.id,
+          jobTitle: e.job_title,
+          company: e.company,
+          country: parseInt(e.country) || null,
+          city: parseInt(e.city) || null,
+          startDate: parseFlexibleDate(e.start_date), // "2020-01" -> "2020-01-01"
+          endDate: parseFlexibleDate(e.end_date),
+          salary: e.salary || null,
+          responsibility: e.responsibilities || null, // note: DB column is singular
+          reasonForLeave: e.reason || null,
+          cityOther: e.cityOther || "",
+        })),
+      }),
+    ]);
+    return NextResponse.json({ ok: true });
+  }
 
   // --- Education tab (full replace) ---------------------------------------
-  // if (body.education) {
-  //   await prisma.$transaction([
-  //     prisma.education.deleteMany({ where: { profileId: profile.id } }),
-  //     prisma.education.createMany({
-  //       data: body.education.map((e: any) => ({
-  //         profileId: profile.id,
-  //         degree: e.degree,
-  //         institution: e.institution,
-  //         year: e.year,
-  //         grade: e.grade || null,
-  //       })),
-  //     }),
-  //   ]);
-  //   return NextResponse.json({ ok: true });
-  // }
+  if (body.education) {
+    await prisma.$transaction([
+      prisma.education.deleteMany({
+        where: { profileId: profile.id },
+      }),
+      prisma.education.createMany({
+        data: body.education.map((e: any) => ({
+          profileId: profile.id,
+          qualificationGroupId: parseInt(
+            e.qualification_group_id || e.qualificationGroupId,
+          ),
+          qualificationId: parseInt(e.qualification_id || e.qualificationId),
+          institutionId:
+            e.institute_id === "other" || !e.institute_id
+              ? null
+              : parseInt(e.institute_id),
+          instituteOther:
+            e.institute_id === "other" ? e.institute_other || "" : "",
+          majorSubject: e.major_subject || e.majorSubject || "",
+          countryId: parseInt(e.country_id || e.country || "0"),
+          cityId: e.city === "other" || !e.city ? null : parseInt(e.city),
+          cityOther: e.city_other || e.cityOther || "",
+          passingYear: parseInt(e.passing_year || e.passingYear || "0"),
 
+          // FIX: Match payload keys (obtained_marks_gpa & total_marks_gpa) with safe numeric fallbacks
+          obtainedMarks:
+            parseFloat(e.obtained_marks_gpa || e.obtained_marks || "0") || 0,
+          totalMarks:
+            parseFloat(e.total_marks_gpa || e.total_marks || "0") || 0,
+            divisionGrade:e.division_grade ?? ""
+        })),
+      }),
+    ]);
+
+    return NextResponse.json({ ok: true });
+  }
   // // --- Certificates tab (full replace) -------------------------------------
-  // if (body.certificates) {
-  //   await prisma.$transaction([
-  //     prisma.certificate.deleteMany({ where: { profileId: profile.id } }),
-  //     prisma.certificate.createMany({
-  //       data: body.certificates.map((c: any) => ({
-  //         profileId: profile.id,
-  //         name: c.name,
-  //         organisation: c.organisation,
-  //         issue_date: c.issue_date,
-  //         credential_id: c.credential_id || null,
-  //       })),
-  //     }),
-  //   ]);
-  //   return NextResponse.json({ ok: true });
-  // }
+  if (body.certificates) {
+    await prisma.$transaction([
+      prisma.certificate.deleteMany({ where: { profileId: profile.id } }),
+      prisma.certificate.createMany({
+        data: body.certificates.map((c: any) => ({
+          profileId: profile.id,
+          certficateName: c.name,
+          organisation: c.organisation,
+          issueDate: c.issue_date,
+        })),
+      }),
+    ]);
+    return NextResponse.json({ ok: true });
+  }
 
   // // --- Memberships tab (full replace) ---------------------------------------
-  // if (body.memberships) {
-  //   await prisma.$transaction([
-  //     prisma.membership.deleteMany({ where: { profileId: profile.id } }),
-  //     prisma.membership.createMany({
-  //       data: body.memberships.map((m: any) => ({
-  //         profileId: profile.id,
-  //         organisation: m.organisation,
-  //         membership_type: m.membership_type || null,
-  //         member_since: m.member_since || null,
-  //         membership_id: m.membership_id || null,
-  //       })),
-  //     }),
-  //   ]);
-  //   return NextResponse.json({ ok: true });
-  // }
+  if (body.memberships) {
+    await prisma.$transaction([
+      prisma.membership.deleteMany({ where: { profileId: profile.id } }),
+      prisma.membership.createMany({
+        data: body.memberships.map((m: any) => ({
+          profileId: profile.id,
+          organisation: m.organisation,
+          membershipType: m.membership_type || null,
+          memberSince: m.member_since || null,
+        })),
+      }),
+    ]);
+    return NextResponse.json({ ok: true });
+  }
 
   return NextResponse.json({ error: "Unrecognised payload" }, { status: 400 });
 }
