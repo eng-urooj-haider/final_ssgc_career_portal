@@ -915,6 +915,7 @@ function ExperienceTab({
   onRemove,
   errors,
 }: ExperienceTabProps) {
+  console.log("entries", entries);
   const { data: profile } = useUserProfile();
   const experience = profile.experiences;
   function toMonthInput(date: string | Date | null | undefined): string {
@@ -1456,9 +1457,6 @@ interface CertificateEntry {
   id: number;
   name: string;
   organisation: string;
-  document_name: string;
-  // FIX: the actual File object is stored under this key when uploading,
-  // but it was previously missing from the type entirely.
   document?: File | null;
   issue_date: string;
 }
@@ -1467,7 +1465,6 @@ const emptyCertificate = (id: number): CertificateEntry => ({
   id,
   name: "",
   organisation: "",
-  document_name: "",
   document: null,
   issue_date: "",
 });
@@ -1484,13 +1481,45 @@ interface CertificatesTabProps {
   errors: Record<string, string>;
 }
 
-function CertificatesTab({
+export function CertificatesTab({
   entries,
   onFieldChange,
   onAdd,
   onRemove,
+  setFormData,
   errors,
 }: CertificatesTabProps) {
+  const { data: profile } = useUserProfile();
+  const profileCertificates = profile?.certificates;
+
+  React.useEffect(() => {
+    if (profileCertificates && profileCertificates.length > 0) {
+      setFormData((prev: any) => ({
+        ...prev,
+        certificates: profileCertificates.map((cert: any, index: number) => ({
+          id: cert.id ?? index + 1,
+          name: cert.certificateName || "",
+          organisation: cert.organisation || "",
+          // Formats "2026-09-01T00:00:00.000Z" to "2026-09-01" for <input type="date" />
+          issue_date: cert.issueDate ? cert.issueDate.split("T")[0] : "",
+          document: cert.document || null,
+        })),
+      }));
+    }
+  }, [profileCertificates, setFormData]);
+
+  // Helper function to extract and display file name from string path or File object
+  const getDocumentName = (doc: any) => {
+    if (!doc) return "Choose file...";
+    if (typeof doc === "string") {
+      return doc.split("/").pop();
+    }
+    if (doc instanceof File) {
+      return doc.name;
+    }
+    return "File attached";
+  };
+
   return (
     <div>
       <SectionHeading
@@ -1554,7 +1583,7 @@ function CertificatesTab({
                 <div className="flex items-center gap-2">
                   <label className="flex-1 cursor-pointer rounded-md border border-gray-300 bg-white p-2 text-sm text-gray-700 shadow-sm transition hover:bg-gray-50 flex items-center justify-between">
                     <span className="truncate">
-                      {entry.document ? entry.document.name : "Choose file..."}
+                      {getDocumentName(entry.document)}
                     </span>
                     <span className="ml-2 rounded bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
                       Browse
@@ -1565,26 +1594,17 @@ function CertificatesTab({
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null;
-                        // FIX: this previously wrote the File object to
-                        // "document_name" and then immediately overwrote it
-                        // with the filename, so the File was never kept.
-                        onFieldChange(entry.id, "document", file);
-                        onFieldChange(
-                          entry.id,
-                          "document_name",
-                          file ? file.name : "",
-                        );
+                        if (file) {
+                          onFieldChange(entry.id, "document", file);
+                        }
                       }}
                     />
                   </label>
 
-                  {(entry.document || entry.document_name) && (
+                  {entry.document && (
                     <button
                       type="button"
-                      onClick={() => {
-                        onFieldChange(entry.id, "document", null);
-                        onFieldChange(entry.id, "document_name", "");
-                      }}
+                      onClick={() => onFieldChange(entry.id, "document", null)}
                       className="rounded p-2 text-red-500 hover:bg-red-50 hover:text-red-700"
                       title="Remove attachment"
                     >
@@ -1640,15 +1660,15 @@ function MembershipsTab({
   onAdd,
   onRemove,
   errors,
-  setFormData
+  setFormData,
 }: MembershipsTabProps) {
   const { data: profile } = useUserProfile();
-  const memberships = profile.membership;
+  const memberships = profile.memberships;
   React.useEffect(() => {
     if (memberships && memberships.length > 0) {
       setFormData((prev: any) => ({
         ...prev,
-        membership: memberships.map((edu: any, index: number) => ({
+        memberships: memberships.map((edu: any, index: number) => ({
           id: edu.id ?? index + 1,
           membership_type: edu.membershipType ?? "",
           organisation: edu.organisation ?? "",
@@ -1657,7 +1677,7 @@ function MembershipsTab({
       }));
     }
   }, [memberships, setFormData]);
-  console.log(entries)
+  console.log(entries);
   return (
     <div>
       <SectionHeading
@@ -2067,7 +2087,7 @@ export default function ProfileTabs() {
         if (!entry.issue_date) {
           newErrors[`${entry.id}_issue_date`] = "Issue date is required";
         }
-        if (!entry.document_name) {
+        if (!entry.document) {
           // FIX: this previously wrote to `${entry.id}_issue_date`, which
           // clobbered any real issue-date error and never showed under the
           // document field (which reads `${entry.id}_document`).
@@ -2296,7 +2316,6 @@ export default function ProfileTabs() {
           );
           break;
         }
-
         case "education": {
           await axios.patch(
             "/api/profile",
@@ -2309,16 +2328,33 @@ export default function ProfileTabs() {
         }
 
         case "certificates": {
-          await axios.patch(
-            "/api/profile",
-            { certificates: formData.certificates },
-            {
-              withCredentials: true,
-            },
-          );
+          const payload = new FormData();
+
+          const certificatesMeta = formData.certificates.map((cert) => ({
+            id: cert.id,
+            name: cert.name,
+            organisation: cert.organisation,
+            issue_date: cert.issue_date,
+            document: cert.document instanceof File ? null : cert.document,
+          }));
+
+          payload.append("certificates", JSON.stringify(certificatesMeta));
+          formData.certificates.forEach((cert, index) => {
+            if (cert.document instanceof File) {
+              payload.append(`document_${index}`, cert.document);
+            }
+          });
+
+          const res = await axios.patch("/api/profile", payload, {
+            withCredentials: true,
+          });
+
+          setFormData((prev) => ({
+            ...prev,
+            certificates: res.data.certificates,
+          }));
           break;
         }
-
         case "memberships": {
           await axios.patch(
             "/api/profile",
@@ -2459,6 +2495,7 @@ export default function ProfileTabs() {
               <CertificatesTab
                 entries={formData.certificates}
                 errors={errors}
+                setFormData={setFormData}
                 {...certificatesHandlers}
               />
             )}

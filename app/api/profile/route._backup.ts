@@ -1,57 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/lib/db";
 import { verifyToken } from "@/app/lib/auth";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-
 function parseSafeBoolean(value: unknown): boolean {
   if (typeof value === "boolean") return value;
+
   if (typeof value === "string") {
     const sanitized = value.trim().toUpperCase();
     return sanitized === "YES" || sanitized === "TRUE" || sanitized === "1";
   }
+
   if (typeof value === "number") {
     return value === 1;
   }
+
   return false;
 }
-
-function parseFlexibleDate(value: unknown): Date | null {
-  if (!value || typeof value !== "string" || !value.trim()) return null;
-  const direct = new Date(value);
-  if (!Number.isNaN(direct.getTime())) return direct;
-
-  const withDay = new Date(`${value}-01`);
-  if (!Number.isNaN(withDay.getTime())) return withDay;
-
-  return null;
-}
-
 export async function PATCH(req: NextRequest) {
   const token = req.cookies.get("token")?.value;
   const decode = await verifyToken(token);
-  const userId = decode?.userId;
-
+  const userId = decode.userId;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Detect whether request content is FormData or JSON
-  const contentType = req.headers.get("content-type") || "";
-  let body: Record<string, any> = {};
-  let formData: FormData | null = null;
+  const body = await req.json();
 
-  if (contentType.includes("multipart/form-data")) {
-    formData = await req.formData();
-    const certificatesRaw = formData.get("certificates") as string;
-    if (certificatesRaw) {
-      body.certificates = JSON.parse(certificatesRaw);
-    }
-  } else {
-    body = await req.json();
-  }
-
-  // Ensure Profile row exists
+  // Make sure a Profile row exists for this user before touching child tables.
   const profile = await prisma.profile.upsert({
     where: { userId: userId },
     update: {},
@@ -93,7 +67,20 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ profile: updated });
   }
 
-  // --- Experience tab ----------------------------------------------------
+  // --- Experience tab (full replace) -------------------------------------
+  function parseFlexibleDate(value: unknown): Date | null {
+    if (!value || typeof value !== "string" || !value.trim()) return null;
+
+    // Try parsing as-is first (covers full ISO strings from the DB)
+    const direct = new Date(value);
+    if (!Number.isNaN(direct.getTime())) return direct;
+
+    // Fall back to YYYY-MM (from <input type="month">) by appending a day
+    const withDay = new Date(`${value}-01`);
+    if (!Number.isNaN(withDay.getTime())) return withDay;
+
+    return null;
+  }
   if (body.experience) {
     await prisma.$transaction([
       prisma.experience.deleteMany({ where: { profileId: profile.id } }),
@@ -104,10 +91,10 @@ export async function PATCH(req: NextRequest) {
           company: e.company,
           country: parseInt(e.country) || null,
           city: parseInt(e.city) || null,
-          startDate: parseFlexibleDate(e.start_date),
+          startDate: parseFlexibleDate(e.start_date), // "2020-01" -> "2020-01-01"
           endDate: parseFlexibleDate(e.end_date),
           salary: e.salary || null,
-          responsibility: e.responsibilities || null,
+          responsibility: e.responsibilities || null, // note: DB column is singular
           reasonForLeave: e.reason || null,
           cityOther: e.cityOther || "",
         })),
@@ -116,10 +103,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // --- Education tab -----------------------------------------------------
+  // --- Education tab (full replace) ---------------------------------------
   if (body.education) {
     await prisma.$transaction([
-      prisma.education.deleteMany({ where: { profileId: profile.id } }),
+      prisma.education.deleteMany({
+        where: { profileId: profile.id },
+      }),
       prisma.education.createMany({
         data: body.education.map((e: any) => ({
           profileId: profile.id,
@@ -138,64 +127,36 @@ export async function PATCH(req: NextRequest) {
           cityId: e.city === "other" || !e.city ? null : parseInt(e.city),
           cityOther: e.city_other || e.cityOther || "",
           passingYear: parseInt(e.passing_year || e.passingYear || "0"),
+
+          // FIX: Match payload keys (obtained_marks_gpa & total_marks_gpa) with safe numeric fallbacks
           obtainedMarks:
             parseFloat(e.obtained_marks_gpa || e.obtained_marks || "0") || 0,
           totalMarks:
             parseFloat(e.total_marks_gpa || e.total_marks || "0") || 0,
-          divisionGrade: e.division_grade ?? "",
+            divisionGrade:e.division_grade ?? ""
         })),
       }),
     ]);
 
     return NextResponse.json({ ok: true });
   }
-
-  // --- Certificates tab --------------------------------------------------
+  // // --- Certificates tab (full replace) -------------------------------------
   if (body.certificates) {
-    const certificatesList = Array.isArray(body.certificates)
-      ? body.certificates
-      : JSON.parse(body.certificates);
-
-    const uploadDir = path.join(process.cwd(), "public/uploads/certificates");
-    await mkdir(uploadDir, { recursive: true });
-
-    // Prepare certificate records and write binary files to disk
-    const certificateRecords = await Promise.all(
-      certificatesList.map(async (cert: any, index: number) => {
-        let documentUrl = cert.document || null;
-
-        if (formData) {
-          const file = formData.get(`document_${index}`) as File | null;
-          if (file && file.size > 0) {
-            const bytes = await file.arrayBuffer();
-            const buffer = Buffer.from(bytes);
-            const uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.name)}`;
-            const filePath = path.join(uploadDir, uniqueFilename);
-
-            await writeFile(filePath, buffer);
-            documentUrl = `/uploads/certificates/${uniqueFilename}`;
-          }
-        }
-
-        return {
-          profileId: profile.id,
-          certificateName: cert.name || "",
-          organisation: cert.organisation || cert.organization || "",
-          issueDate: cert.issue_date ? new Date(cert.issue_date) : null,
-          document: documentUrl,
-        };
-      }),
-    );
-
     await prisma.$transaction([
       prisma.certificate.deleteMany({ where: { profileId: profile.id } }),
-      prisma.certificate.createMany({ data: certificateRecords }),
+      prisma.certificate.createMany({
+        data: body.certificates.map((c: any) => ({
+          profileId: profile.id,
+          certficateName: c.name,
+          organisation: c.organisation,
+          issueDate: c.issue_date,
+        })),
+      }),
     ]);
-
     return NextResponse.json({ ok: true });
   }
 
-  // --- Memberships tab ---------------------------------------------------
+  // // --- Memberships tab (full replace) ---------------------------------------
   if (body.memberships) {
     await prisma.$transaction([
       prisma.membership.deleteMany({ where: { profileId: profile.id } }),
