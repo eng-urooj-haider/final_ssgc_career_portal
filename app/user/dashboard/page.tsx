@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import {
+  findId,
   GetCities,
   GetCountries,
   GetExperiences,
@@ -30,6 +31,7 @@ import {
 } from "@/app/lib/dashboard";
 import { useQuery } from "@tanstack/react-query";
 import useUserProfile from "@/app/lib/fetchUserProfile";
+import { useSearchParams } from "next/navigation";
 
 type TabId =
   | "photo"
@@ -469,13 +471,28 @@ interface PersonalTabProps {
   // FIX: this prop was used in the component body but never declared here.
   setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
+function useFindingId() {
+  const searchParams = useSearchParams();
+  const jobId = searchParams.get("jobId"); // "12" or null
 
+  const { data: ids = [], isLoading } = useQuery({
+    queryKey: ["loading_ids"],
+    queryFn: findId,
+    enabled: !!jobId, // only call the API when the URL has ?jobId=
+  });
+
+  // works for [1, 2, 3] and for [{ id: 1 }, { id: 2 }]
+  const exists = ids.some((x: any) => String(x?.id ?? x) === jobId);
+
+  return { jobId, exists, isLoading };
+}
 function PersonalTab({
   formData,
   onChange,
   errors,
   setFormData,
 }: PersonalTabProps) {
+  const { jobId, exists, isLoading } = useFindingId();
   // const fetchUserProfile = async () => {
   //   const res = await axios.get("/api/user_profile", { withCredentials: true });
   //   return res.data.profile;
@@ -515,6 +532,11 @@ function PersonalTab({
   }, [profile]);
   return (
     <div>
+      {jobId && !isLoading && !exists && (
+        <p className="mb-4 text-sm font-medium text-red-600">
+          This job link is invalid.
+        </p>
+      )}
       <SectionHeading
         title="Personal details"
         description="This information is used across your applications."
@@ -917,7 +939,7 @@ function ExperienceTab({
 }: ExperienceTabProps) {
   console.log("entries", entries);
   const { data: profile } = useUserProfile();
-  const experience = profile.experiences;
+  const experience = profile?.experiences;
   function toMonthInput(date: string | Date | null | undefined): string {
     if (!date) return "";
     const d = new Date(date);
@@ -1393,7 +1415,7 @@ export function EducationTab({
   });
 
   const { data: profile } = useUserProfile();
-  const profileEducation = profile.education;
+  const profileEducation = profile?.education;
 
   React.useEffect(() => {
     if (profileEducation && profileEducation.length > 0) {
@@ -1493,7 +1515,7 @@ export function CertificatesTab({
   const profileCertificates = profile?.certificates;
 
   React.useEffect(() => {
-    if (profileCertificates && profileCertificates.length > 0) {
+    if (profileCertificates && profileCertificates?.length > 0) {
       setFormData((prev: any) => ({
         ...prev,
         certificates: profileCertificates.map((cert: any, index: number) => ({
@@ -1663,7 +1685,7 @@ function MembershipsTab({
   setFormData,
 }: MembershipsTabProps) {
   const { data: profile } = useUserProfile();
-  const memberships = profile.memberships;
+  const memberships = profile?.memberships;
   React.useEffect(() => {
     if (memberships && memberships.length > 0) {
       setFormData((prev: any) => ({

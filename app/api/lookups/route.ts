@@ -1,7 +1,7 @@
 import prisma from "@/app/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
-export const GET = async (req:NextRequest) => {
+export const GET = async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type");
@@ -13,17 +13,32 @@ export const GET = async (req:NextRequest) => {
         });
         return NextResponse.json({ success: true, data });
       }
-      case "qualifications":{
+      case "qualifications": {
         const data = await prisma.qualification.findMany({
-          orderBy:{name:"asc"}
-        })
+          orderBy: { name: "asc" },
+        });
         return NextResponse.json({ success: true, data });
       }
-      case "institutes":{
+      case "institutes": {
         const data = await prisma.institution.findMany({
-          orderBy:{name:"asc"}
-        })
+          orderBy: { name: "asc" },
+        });
         return NextResponse.json({ success: true, data });
+      }
+      case "id": {
+        const id = Number(searchParams.get("id"));
+
+        // not a valid number -> not found
+        if (!Number.isInteger(id) || id <= 0) {
+          return NextResponse.json({ success: true, exists: false });
+        }
+
+        const job = await prisma.job.findUnique({
+          where: { id },
+          select: { id: true, title: true, jobCode: true },
+        });
+
+        return NextResponse.json({ success: true, exists: !!job, data: job });
       }
       default:
         return NextResponse.json(

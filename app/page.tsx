@@ -1,5 +1,12 @@
+// app/page.tsx
+import type { Metadata } from "next";
+import Link from "next/link";
 import { Archivo, Inter } from "next/font/google";
+import { CalendarDays, Clock, Download, MapPin } from "lucide-react";
 import prisma from "./lib/db";
+import { flame, flameGradient } from "./lib/flameTheme";
+import { htmlToPlainText } from "./lib/textFormat";
+
 const archivo = Archivo({
   subsets: ["latin"],
   weight: ["600", "700", "800"],
@@ -12,271 +19,391 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-// Regenerate this page at most once per hour — keeps job postings fresh
-// without needing client-side fetching (useQuery), which would hurt SEO
-// since crawlers need the job content present in the initial HTML.
+// Regenerate at most once per hour. See the note below about on-demand
+// revalidation so new jobs appear immediately after saving.
 export const revalidate = 3600;
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Careers at SSGC",
   description:
     "Current job openings and archived postings at Sui Southern Gas Company.",
 };
 
-// Matches your Prisma Job model exactly — snake_case fields, real DB shape
-interface JobRecord {
-  id: number;
-  job_code: string;
-  title: string;
-  city: string[];
-  publication_date: Date;
-  deadline: Date;
-  age: number | null;
-  qualification: string;
-  skill: string | null;
-  responsibility: string | null;
-  special_info: string | null;
-  doc1_title: string | null;
-  doc1_attachment: string | null;
-  doc2_title: string | null;
-  doc2_attachment: string | null;
-  job_type: string;
-  email: string | null;
+/* -------------------------------------------------------------------------- */
+/*  Data                                                                       */
+/* -------------------------------------------------------------------------- */
+
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+// `deadline` is a date-only value stored as UTC midnight. A job stays open
+// until the end of that day in Pakistan (UTC+5, no DST) = 19:00 UTC.
+const CLOSE_OFFSET_MS = 19 * HOUR;
+
+async function getJobs() {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - CLOSE_OFFSET_MS);
+  const published = { publicationDate: { lte: now } }; // hide future postings
+
+  const [current, archived] = await Promise.all([
+    prisma.job.findMany({
+      where: { ...published, deadline: { gt: cutoff } },
+      orderBy: { publicationDate: "desc" },
+    }),
+    prisma.job.findMany({
+      where: { ...published, deadline: { lte: cutoff } },
+      orderBy: { deadline: "desc" },
+      take: 50,
+    }),
+  ]);
+
+  return { current, archived, now: now.getTime() };
 }
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString("en-GB", {
+type JobRecord = Awaited<ReturnType<typeof getJobs>>["current"][number];
+
+/* -------------------------------------------------------------------------- */
+/*  Helpers                                                                    */
+/* -------------------------------------------------------------------------- */
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "UTC", // @db.Date is stored as UTC midnight
   });
-}
 
-function cityLine(job: JobRecord) {
-  return Array.isArray(job.city) ? job.city.join(", ") : "";
-}
+const getCities = (job: JobRecord): string[] =>
+  Array.isArray(job.cities) ? (job.cities as string[]) : [];
 
-function DetailRow({ label, html }: { label: string; html?: string | null }) {
-  if (!html) return null;
+const daysLeft = (deadline: Date, now: number) =>
+  Math.ceil((deadline.getTime() + CLOSE_OFFSET_MS - now) / DAY);
+
+const applyHref = (job: JobRecord) =>
+  job.email
+    ? `mailto:${job.email}?subject=${encodeURIComponent(
+        `Application for ${job.title} (${job.jobCode})`,
+      )}`
+    : `/user/dashboard?jobId=${job.id}`;
+
+/* -------------------------------------------------------------------------- */
+/*  UI pieces                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function DeadlineBadge({ left }: { left: number }) {
+  const urgent = left <= 3;
   return (
-    <tr className="border-b border-[#DCE7F5] last:border-b-0">
-      <td className="w-48 shrink-0 px-5 py-4 align-top text-sm font-semibold text-[#0F2A52]">
-        {label}
-      </td>
-      {/* Source content may include simple inline HTML (e.g. bullet lists),
-          same as the original Blade template's {!! !!} fields. */}
-      <td
-        className="px-5 py-4 text-[15px] leading-relaxed text-[#3D5170]"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    </tr>
+    <span
+      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+        urgent
+          ? "bg-[#F0862E]/15 text-[#FBB03B]"
+          : "bg-white/10 text-white/80"
+      }`}
+    >
+      {left <= 1 ? "Closes today" : `${left} days left`}
+    </span>
   );
 }
 
-function JobPosting({ job }: { job: JobRecord }) {
-  const applyHref = job.email
-    ? `mailto:${job.email}`
-    : `/user/dashboard/?jobId=${job.id}`;
+function Detail({ label, text }: { label: string; text?: string | null }) {
+  const value = htmlToPlainText(text);
+  if (!value) return null;
+  return (
+    <div className="grid gap-1 border-b border-[#E7E5E1] px-5 py-4 last:border-b-0 sm:grid-cols-[12rem_1fr] sm:gap-6">
+      <dt className="text-sm font-semibold" style={{ color: flame.ink }}>
+        {label}
+      </dt>
+      <dd className="whitespace-pre-line text-[15px] leading-relaxed text-slate-600">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function DocDetail({ title, href }: { title: string | null; href: string }) {
+  return (
+    <div className="grid items-center gap-1 border-b border-[#E7E5E1] px-5 py-3.5 last:border-b-0 sm:grid-cols-[12rem_1fr] sm:gap-6">
+      <dt className="text-sm font-semibold" style={{ color: flame.ink }}>
+        {title || "Document"}
+      </dt>
+      <dd>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1C6FD9] transition-colors hover:text-[#F0862E]"
+        >
+          <Download className="h-4 w-4" />
+          Download file
+        </a>
+      </dd>
+    </div>
+  );
+}
+
+// Structured data so Google can show the job in job search results.
+// "<" is escaped so the JSON can never break out of the script tag.
+function JobJsonLd({ job }: { job: JobRecord }) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: job.title,
+    identifier: {
+      "@type": "PropertyValue",
+      name: "SSGC",
+      value: job.jobCode,
+    },
+    datePosted: job.publicationDate.toISOString().slice(0, 10),
+    validThrough: job.deadline.toISOString().slice(0, 10),
+    hiringOrganization: {
+      "@type": "Organization",
+      name: "Sui Southern Gas Company",
+    },
+    jobLocation: getCities(job).map((city) => ({
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: city,
+        addressCountry: "PK",
+      },
+    })),
+    description: [job.qualification, job.skill, job.responsibility]
+      .map(htmlToPlainText)
+      .filter(Boolean)
+      .join("\n\n"),
+  };
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(data).replace(/</g, "\\u003c"),
+      }}
+    />
+  );
+}
+
+function JobPosting({ job, now }: { job: JobRecord; now: number }) {
+  const cities = getCities(job);
+  const special = htmlToPlainText(job.specialInfo);
+  const hasDocs = job.doc1Attachment || job.doc2Attachment;
+  const left = daysLeft(job.deadline, now);
+  const href = applyHref(job);
+  const buttonClass =
+    "inline-flex items-center rounded-md px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90";
 
   return (
-    <article className="mb-10 overflow-hidden rounded-sm border border-[#C9D9EE] bg-white shadow-[0_1px_3px_rgba(15,58,145,0.06)]">
-      {/* Job code bar — deep flame-blue base */}
-      <div className="flex items-center gap-2 bg-[#0B2E6B] px-5 py-2.5">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#8FB8FF]">
-          Job code
-        </span>
-        <span className="text-sm font-semibold text-white">{job.job_code}</span>
+    <article
+      id={`job-${job.id}`}
+      className="mb-8 scroll-mt-6 overflow-hidden rounded-xl bg-white"
+      style={{
+        border: "1px solid #E7E5E1",
+        boxShadow: "0 1px 2px rgba(11,31,51,0.04)",
+      }}
+    >
+      <JobJsonLd job={job} />
+      <div className="h-1" style={{ background: flameGradient }} />
+
+      {/* Job code bar */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5"
+        style={{ background: flame.ink }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-white/60">
+            Job code
+          </span>
+          <span className="text-sm font-semibold text-white">
+            {job.jobCode}
+          </span>
+          <span className="ml-1 rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white/80">
+            {job.jobType}
+          </span>
+        </div>
+        <DeadlineBadge left={left} />
       </div>
 
-      {/* Title / location / deadline */}
-      <div className="grid grid-cols-1 divide-y divide-[#DCE7F5] border-b border-[#DCE7F5] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-        <div className="px-5 py-4">
-          <p className="text-xs font-medium text-[#5E7396]">Job title</p>
-          <p className="mt-1 font-[family-name:var(--font-archivo)] text-lg font-bold text-[#0F2A52]">
-            {job.title}
-          </p>
-        </div>
-        <div className="px-5 py-4">
-          <p className="text-xs font-medium text-[#5E7396]">Location</p>
-          <p className="mt-1 text-[15px] font-medium text-[#0F2A52]">
-            {cityLine(job)}
-          </p>
-        </div>
-        <div className="px-5 py-4">
-          <p className="text-xs font-medium text-[#5E7396]">Deadline</p>
-          {/* Deadline gets the flame-tip orange — the "urgent" accent color */}
-          <p className="mt-1 text-[15px] font-semibold text-[#E8720C]">
-            {formatDate(job.deadline)}
-          </p>
+      {/* Title + meta */}
+      <div className="border-b border-[#E7E5E1] px-5 py-5">
+        <h2
+          className="break-words font-[family-name:var(--font-archivo)] text-xl font-bold"
+          style={{ color: flame.ink }}
+        >
+          {job.title}
+        </h2>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
+          {cities.length > 0 && (
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              <MapPin className="h-4 w-4 text-[#1C6FD9]" />
+              {cities.map((c) => (
+                <span
+                  key={c}
+                  className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700"
+                >
+                  {c}
+                </span>
+              ))}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarDays className="h-4 w-4 text-[#1C6FD9]" />
+            Posted {formatDate(job.publicationDate)}
+          </span>
+          <span className="inline-flex items-center gap-1.5 font-semibold text-[#D96F12]">
+            <Clock className="h-4 w-4" />
+            Apply by {formatDate(job.deadline)}
+          </span>
         </div>
       </div>
 
-      {job.special_info && (
-        <div
-          className="border-b border-[#DCE7F5] bg-[#FFF1E2] px-5 py-3 text-sm font-medium text-[#B4530A]"
-          dangerouslySetInnerHTML={{ __html: job.special_info }}
-        />
+      {special && (
+        <div className="whitespace-pre-line border-b border-[#E7E5E1] bg-[#FFF4E8] px-5 py-3 text-sm font-medium text-[#B4530A]">
+          {special}
+        </div>
       )}
 
-      {/* Job details */}
-      <div className="px-5 pt-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#5E7396]">
-          Job details
-        </p>
-      </div>
-      <table className="w-full text-left">
-        <tbody>
-          <DetailRow
-            label="Qualification & experience"
-            html={job.qualification}
-          />
-          {job.age && (
-            <tr className="border-b border-[#DCE7F5] last:border-b-0">
-              <td className="w-48 shrink-0 px-5 py-4 align-top text-sm font-semibold text-[#0F2A52]">
-                Age
-              </td>
-              <td className="px-5 py-4 text-[15px] text-[#3D5170]">
-                Not more than {job.age} years
-              </td>
-            </tr>
-          )}
-          <DetailRow label="Skills" html={job.skill} />
-          <DetailRow label="Responsibilities" html={job.responsibility} />
+      {/* Details */}
+      <dl>
+        <Detail label="Qualification & experience" text={job.qualification} />
+        {job.maxAge != null && (
+          <div className="grid gap-1 border-b border-[#E7E5E1] px-5 py-4 sm:grid-cols-[12rem_1fr] sm:gap-6">
+            <dt className="text-sm font-semibold" style={{ color: flame.ink }}>
+              Age
+            </dt>
+            <dd className="text-[15px] text-slate-600">
+              Not more than {job.maxAge} years
+            </dd>
+          </div>
+        )}
+        <Detail label="Skills" text={job.skill} />
+        <Detail label="Responsibilities" text={job.responsibility} />
+      </dl>
 
-          {(job.doc1_attachment || job.doc2_attachment) && (
-            <tr className="border-b border-[#DCE7F5] bg-[#F1F6FD]">
-              <td colSpan={2} className="px-5 py-3 text-sm text-[#3D5170]">
-                Applicants must download the form(s) below and attach the
-                duly-filled form(s) with their application.
-              </td>
-            </tr>
-          )}
-          {job.doc1_attachment && (
-            <tr className="border-b border-[#DCE7F5]">
-              <td className="w-48 shrink-0 px-5 py-4 align-top text-sm font-semibold text-[#0F2A52]">
-                {job.doc1_title}
-              </td>
-              <td className="px-5 py-4">
-                <a
-                  href={job.doc1_attachment}
-                  className="text-sm font-medium text-[#1554C7] underline underline-offset-2 hover:text-[#0B2E6B]"
-                >
-                  Download file
-                </a>
-              </td>
-            </tr>
-          )}
-          {job.doc2_attachment && (
-            <tr>
-              <td className="w-48 shrink-0 px-5 py-4 align-top text-sm font-semibold text-[#0F2A52]">
-                {job.doc2_title}
-              </td>
-              <td className="px-5 py-4">
-                <a
-                  href={job.doc2_attachment}
-                  className="text-sm font-medium text-[#1554C7] underline underline-offset-2 hover:text-[#0B2E6B]"
-                >
-                  Download file
-                </a>
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      {hasDocs && (
+        <div className="border-t border-[#E7E5E1] bg-[#FBFBFA]">
+          <p className="px-5 pt-4 text-sm text-slate-600">
+            Applicants must download the form(s) below and attach the
+            duly-filled form(s) with their application.
+          </p>
+          <dl>
+            {job.doc1Attachment && (
+              <DocDetail title={job.doc1Title} href={job.doc1Attachment} />
+            )}
+            {job.doc2Attachment && (
+              <DocDetail title={job.doc2Title} href={job.doc2Attachment} />
+            )}
+          </dl>
+        </div>
+      )}
 
-      <div className="px-5 py-5">
-        {/* Apply button — flame-tip orange, the highest-emphasis color on the page */}
-        <a
-          href={applyHref}
-          className="inline-flex items-center gap-2 rounded-sm bg-[#E8720C] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#C85E06]"
-        >
-          Apply now
-        </a>
+      <div className="border-t border-[#E7E5E1] px-5 py-5">
+        {job.email ? (
+          <a href={href} className={buttonClass} style={{ background: flameGradient }}>
+            Apply by email
+          </a>
+        ) : (
+          <Link href={href} className={buttonClass} style={{ background: flameGradient }}>
+            Apply now
+          </Link>
+        )}
       </div>
     </article>
   );
 }
 
-export default async function CareersPage() {
-  const allJobs = await prisma.job.findMany({
-    orderBy: { created_at: "desc" },
-  });
+/* -------------------------------------------------------------------------- */
+/*  Page                                                                       */
+/* -------------------------------------------------------------------------- */
 
-  const now = new Date();
-  const currentJobs = allJobs.filter((job) => new Date(job.deadline) >= now);
-  const previousJobs = allJobs.filter((job) => new Date(job.deadline) < now);
+export default async function CareersPage() {
+  const { current, archived, now } = await getJobs();
 
   return (
     <main
-      className={`${archivo.variable} ${inter.variable} min-h-screen bg-[#F3F7FD] font-[family-name:var(--font-inter)] text-[#0F2A52]`}
+      className={`${archivo.variable} ${inter.variable} min-h-screen font-[family-name:var(--font-inter)]`}
+      style={{ background: flame.paper, color: flame.ink }}
     >
-      {/* Header */}
-      <header className="border-b border-[#C9D9EE] bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-5">
-          <div className="font-[family-name:var(--font-archivo)] text-xl font-extrabold tracking-tight text-[#0B2E6B]">
+      <header className="border-b border-[#E7E5E1] bg-white">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+          <div
+            className="font-[family-name:var(--font-archivo)] text-xl font-extrabold tracking-tight"
+            style={{ color: flame.ink }}
+          >
             SSGC
           </div>
-          <a
+          <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 rounded-sm border border-[#0B2E6B] px-4 py-1.5 text-sm font-medium text-[#0B2E6B] hover:bg-[#0B2E6B] hover:text-white"
+            className="rounded-md border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:border-[#1C6FD9] hover:text-[#1C6FD9]"
           >
             Login
-          </a>
+          </Link>
         </div>
+        <div className="h-1" style={{ background: flameGradient }} />
       </header>
 
       <div className="mx-auto max-w-4xl px-6 py-10">
-        <h1 className="mb-8 font-[family-name:var(--font-archivo)] text-2xl font-bold text-[#0F2A52]">
-          Current openings
-        </h1>
+        <div className="mb-8">
+          <h1 className="font-[family-name:var(--font-archivo)] text-2xl font-bold">
+            Current openings
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {current.length > 0
+              ? `${current.length} open ${current.length === 1 ? "position" : "positions"} at Sui Southern Gas Company.`
+              : "Check back soon for new opportunities."}
+          </p>
+        </div>
 
-        {currentJobs.length > 0 ? (
-          currentJobs.map((job) => <JobPosting key={job.id} job={job} />)
+        {current.length > 0 ? (
+          current.map((job) => <JobPosting key={job.id} job={job} now={now} />)
         ) : (
-          <p className="rounded-sm border border-[#C9D9EE] bg-white px-6 py-10 text-center text-[#5E7396]">
-            There are no new jobs opening at this time. Please check back later.
+          <p className="rounded-xl border border-[#E7E5E1] bg-white px-6 py-10 text-center text-slate-500">
+            There are no new jobs opening at this time. Please check back
+            later.
           </p>
         )}
 
-        {/* Archived positions */}
-        {previousJobs.length > 0 && (
-          <div className="mt-14">
-            <hr className="border-[#C9D9EE]" />
-            <h2 className="mb-6 mt-8 font-[family-name:var(--font-archivo)] text-2xl font-bold text-[#0F2A52]">
+        {archived.length > 0 && (
+          <section className="mt-14">
+            <hr className="border-[#E7E5E1]" />
+            <h2 className="mb-1 mt-8 font-[family-name:var(--font-archivo)] text-2xl font-bold">
               Archived positions
             </h2>
+            <p className="mb-6 text-sm text-slate-500">
+              Applications for these positions are closed.
+            </p>
 
-            <div className="overflow-x-auto rounded-sm border border-[#C9D9EE] bg-white">
+            <div className="overflow-x-auto rounded-xl border border-[#E7E5E1] bg-white">
               <table className="w-full min-w-[640px] text-left text-sm">
+                <caption className="sr-only">Archived job positions</caption>
                 <thead>
-                  <tr className="border-b border-[#C9D9EE] bg-[#EAF1FB] text-[#5E7396]">
-                    <th className="px-5 py-3 font-medium">Job code</th>
-                    <th className="px-5 py-3 font-medium">Title</th>
-                    <th className="px-5 py-3 font-medium">Location</th>
-                    <th className="px-5 py-3 font-medium">Publication date</th>
-                    <th className="px-5 py-3 font-medium">Deadline</th>
+                  <tr className="border-b border-[#E7E5E1] bg-[#FBFBFA] text-slate-500">
+                    <th scope="col" className="px-5 py-3 font-semibold">Job code</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Title</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Location</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Published</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Deadline</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {previousJobs.map((job) => (
+                  {archived.map((job) => (
                     <tr
                       key={job.id}
-                      className="border-b border-[#DCE7F5] last:border-b-0"
+                      className="border-b border-[#E7E5E1] last:border-b-0"
                     >
                       <th
                         scope="row"
-                        className="px-5 py-4 text-left font-medium text-[#0F2A52]"
+                        className="px-5 py-4 text-left font-medium"
+                        style={{ color: flame.ink }}
                       >
-                        {job.job_code}
+                        {job.jobCode}
                       </th>
-                      <td className="px-5 py-4 text-[#3D5170]">{job.title}</td>
-                      <td className="px-5 py-4 text-[#3D5170]">
-                        {cityLine(job)}
+                      <td className="px-5 py-4 text-slate-600">{job.title}</td>
+                      <td className="px-5 py-4 text-slate-600">
+                        {getCities(job).join(", ")}
                       </td>
-                      <td className="px-5 py-4 text-[#3D5170]">
-                        {formatDate(job.publication_date)}
+                      <td className="px-5 py-4 text-slate-600">
+                        {formatDate(job.publicationDate)}
                       </td>
-                      <td className="px-5 py-4 text-[#3D5170]">
+                      <td className="px-5 py-4 text-slate-600">
                         {formatDate(job.deadline)}
                       </td>
                     </tr>
@@ -284,14 +411,14 @@ export default async function CareersPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         )}
       </div>
 
-      <footer className="border-t border-[#C9D9EE] bg-white">
-        <div className="mx-auto max-w-4xl px-6 py-8 text-sm text-[#5E7396]">
+      <footer className="border-t border-[#E7E5E1] bg-white">
+        <div className="mx-auto max-w-4xl px-6 py-8 text-sm text-slate-500">
           © {new Date().getFullYear()} Sui Southern Gas Company. All positions
-          are subject to SSGC's recruitment policy.
+          are subject to SSGC&apos;s recruitment policy.
         </div>
       </footer>
     </main>

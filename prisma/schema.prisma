@@ -29,10 +29,10 @@ enum MaritalStatus {
 }
 
 enum JobType {
-  FULL_TIME
-  PART_TIME
-  CONTRACT
-  INTERNSHIP
+  Permanent
+  Staff
+  Trainee
+  Email
 }
 
 // -----------------------------------------------------------------------------
@@ -52,36 +52,36 @@ model User {
 }
 
 model Profile {
-  id                 Int            @id @default(autoincrement())
-  userId             Int            @unique @map("user_id")
-  firstName          String?        @map("first_name") @db.VarChar(100)
-  lastName           String?        @map("last_name") @db.VarChar(100)
-  gender             Gender?
-  fatherName         String?        @map("father_name") @db.VarChar(100)
-  maritalStatus      MaritalStatus? @map("marital_status")
-  childrenCount      Int?           @default(0) @map("children_count")
-  dateOfBirth        DateTime?      @map("date_of_birth") @db.Date
-  birthCountryId     Int?           @map("birth_country_id")
-  birthCityId        Int?           @map("birth_city_id")
-  birthCityOther     String?        @map("birth_city_other") @db.VarChar(100)
-  isPakistani        Boolean        @default(true) @map("is_pakistani")
-  cnic               String?        @map("cnic") @db.VarChar(20)
-  userPic            String?        @map("user_pic")
-  passportNo         String?        @map("passport_no") @db.VarChar(20)
-  domicile           String?        @map("domicile") @db.VarChar(50)
-  mobilePrefix       String?        @map("mobile_prefix") @db.VarChar(10)
-  mobileNumber       String?        @map("mobile_number") @db.VarChar(20)
-  homePrefix         String?        @map("home_prefix") @db.VarChar(10)
-  homeNumber         String?        @map("home_number") @db.VarChar(20)
-  officePrefix       String?        @map("office_prefix") @db.VarChar(10)
-  officeNumber       String?        @map("office_number") @db.VarChar(20)
-  currentAddress     String?        @map("current_address") @db.Text
-  permanentAddress   String?        @map("permanent_address") @db.Text
-  alreadyWorkedSsgc  Boolean        @default(false) @map("already_worked_ssgc")
-  ssgcEmployeeName   String?        @map("ssgc_employee_name") @db.VarChar(100)
-  ssgcEmployeeNumber String?        @map("ssgc_employee_number") @db.VarChar(20)
-  createdAt          DateTime       @default(now()) @map("created_at")
-  updatedAt          DateTime       @updatedAt @map("updated_at")
+  id                  Int            @id @default(autoincrement())
+  userId              Int            @unique @map("user_id")
+  firstName           String?        @map("first_name") @db.VarChar(100)
+  lastName            String?        @map("last_name") @db.VarChar(100)
+  gender              Gender?
+  fatherName          String?        @map("father_name") @db.VarChar(100)
+  maritalStatus       MaritalStatus? @map("marital_status")
+  childrenCount       Int?           @default(0) @map("children_count")
+  dateOfBirth         DateTime?      @map("date_of_birth") @db.Date
+  birthCountryId      Int?           @map("birth_country_id")
+  birthCityId         Int?           @map("birth_city_id")
+  birthCityOther      String?        @map("birth_city_other") @db.VarChar(100)
+  isPakistani         Boolean        @default(true) @map("is_pakistani")
+  cnic                String?        @map("cnic") @db.VarChar(20)
+  userPic             String?        @map("user_pic")
+  passportNo          String?        @map("passport_no") @db.VarChar(20)
+  domicile            String?        @map("domicile") @db.VarChar(50)
+  mobilePrefix        String?        @map("mobile_prefix") @db.VarChar(10)
+  mobileNumber        String?        @map("mobile_number") @db.VarChar(20)
+  homePrefix          String?        @map("home_prefix") @db.VarChar(10)
+  homeNumber          String?        @map("home_number") @db.VarChar(20)
+  officePrefix        String?        @map("office_prefix") @db.VarChar(10)
+  officeNumber        String?        @map("office_number") @db.VarChar(20)
+  currentAddress      String?        @map("current_address") @db.Text
+  permanentAddress    String?        @map("permanent_address") @db.Text
+  alreadyWorkedSsgc   Boolean        @default(false) @map("already_worked_ssgc")
+  ssgcEmployeeName    String?        @map("ssgc_employee_name") @db.VarChar(100)
+  ssgcEmployeeNumber  String?        @map("ssgc_employee_number") @db.VarChar(20)
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
 
   // Relations
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -98,26 +98,30 @@ model Job {
   id      Int    @id @default(autoincrement())
   jobCode String @unique @map("job_code") @db.VarChar(50)
 
-  title           String   @db.VarChar(150)
-  cities          Json? // Storing list of target cities as JSON array
-  publicationDate DateTime @map("publication_date")
-  deadline        DateTime
-  maxAge          Int?     @map("max_age")
-  qualification   String   @db.Text
-  skill           String?  @db.Text
-  responsibility  String?  @db.Text
-  specialInfo     String?  @map("special_info") @db.Text
-  jobType         JobType  @map("job_type")
-  email           String?  @map("email") @db.VarChar(191)
-  doc1_title      String?  @db.VarChar(150)
-  doc1_attachment String?  @db.VarChar(255)
-  doc2_title      String?  @db.VarChar(150)
-  doc2_attachment String?  @db.VarChar(255)
-  req1_doc_title  String?  @db.VarChar(150)
-  req2_doc_title  String?  @db.VarChar(150)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  title               String   @db.VarChar(250)
+  cities              Json // array of city names, e.g. ["Karachi", "Lahore"]
+  publicationDate     DateTime @map("publication_date") @db.Date
+  deadline            DateTime @db.Date
+  maxAge              Int?     @map("max_age")
+  qualification       String   @db.Text
+  skill               String?  @db.Text
+  responsibility      String?  @db.Text
+  specialInfo         String?  @map("special_info") @db.Text
+  jobType             JobType  @map("job_type")
+  email               String?  @db.VarChar(254)
+  doc1Title           String?  @map("doc1_title") @db.VarChar(200)
+  doc1Attachment      String?  @map("doc1_attachment") @db.VarChar(255)
+  doc2Title           String?  @map("doc2_title") @db.VarChar(200)
+  doc2Attachment      String?  @map("doc2_attachment") @db.VarChar(255)
+  req1DocTitle        String?  @map("req1_doc_title") @db.VarChar(200)
+  req2DocTitle        String?  @map("req2_doc_title") @db.VarChar(200)
+  profileCompletionId Int      @map("profile_completions_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
+  profileCompletion ProfileCompletion @relation(fields: [profileCompletionId], references: [id], onDelete: Restrict)
+
+  @@index([profileCompletionId])
   @@map("jobs")
 }
 
@@ -273,4 +277,21 @@ model Membership {
   profile        Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@map("memberships")
+}
+
+model ProfileCompletion {
+  id          Int       @id @default(autoincrement())
+  name String @unique @db.VarChar(255)
+  image       Boolean   @default(false)
+  personal    Boolean   @default(false)
+  experience  Boolean   @default(false)
+  education   Boolean   @default(false)
+  certificate Boolean   @default(false)
+  membership  Boolean   @default(false)
+  count       String    @default("0") @db.VarChar(255)
+  createdAt   DateTime? @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @map("updated_at") @db.Timestamp(0)
+  jobs        Job[]
+
+  @@map("profile_completions")
 }

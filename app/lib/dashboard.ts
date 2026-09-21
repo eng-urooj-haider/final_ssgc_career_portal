@@ -34,3 +34,8 @@ export async function getInstitutes() {
   console.log('res' ,res.data)
   return res.data.data;
 }
+export async function findId() {
+  const res = await axios.get("/api/lookups?type=id" , { withCredentials: true });
+  console.log('res' ,res.data)
+  return res.data.data;
+}

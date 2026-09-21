@@ -1,17 +1,14 @@
 import prisma from "@/app/lib/db";
-import { seedCountries } from "./Seedcountries";
-import { seedCities } from "./Seedcities";
-import { seedQualificationGroups } from "./Seedqualificationgroups";
-import { seedQualifications } from "./Seedqualifications";
+import { seedProfileCompletions } from "./SeedProfileCompletion";
+// import { seedCountries } from "./SeedCountries";
+// ...
 
 async function main() {
-  // Countries/Cities have no foreign key dependencies — order between
-  // them doesn't matter. QualificationGroups must run BEFORE Qualifications
-  // though, since every Qualification row references a qualification_group_id.
-  await seedCountries();
-  await seedCities();
-  await seedQualificationGroups();
-  await seedQualifications();
+  // await seedCountries();
+  // await seedCities();
+  // await seedQualificationGroups();
+  // await seedQualifications();
+  await seedProfileCompletions();
 }
 
 main()

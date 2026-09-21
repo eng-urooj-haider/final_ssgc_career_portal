@@ -1,191 +1,424 @@
 // app/jobs/[id]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import axios from "axios";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Briefcase,
+  CalendarDays,
+  Clock,
+  Download,
+  FileText,
+  Mail,
+  MapPin,
+  Pencil,
+  Users,
+} from "lucide-react";
+import { getJob } from "../../lib/jobs";
+import { flame, flameGradient } from "../../lib/flameTheme";
+import { htmlToPlainText } from "../../lib/textFormat";
+
+/* ------------------------------ Types ------------------------------ */
 
 interface Job {
   id: number;
-  job_code: string;
+  jobCode: string;
   title: string;
-  city: string[];
-  publication_date: string;
+  cities: string[];
+  publicationDate: string;
   deadline: string;
-  age: number | null;
+  maxAge: number | null;
   qualification: string;
   skill: string | null;
   responsibility: string | null;
-  special_info: string | null;
-  doc1_title: string | null;
-  doc1_attachment: string | null;
-  doc2_title: string | null;
-  doc2_attachment: string | null;
-  job_type: string;
+  specialInfo: string | null;
+  doc1Title: string | null;
+  doc1Attachment: string | null;
+  doc2Title: string | null;
+  doc2Attachment: string | null;
+  req1DocTitle: string | null;
+  req2DocTitle: string | null;
+  jobType: string;
   email: string | null;
 }
 
-function formatDate(date: string) {
-  if (!date) return "";
-  return new Date(date).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+/* ----------------------------- Helpers ----------------------------- */
 
-function DetailRow({
-  label,
+const DAY = 24 * 60 * 60 * 1000;
+
+const formatDate = (date?: string | null) =>
+  date
+    ? new Date(date).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC", // @db.Date is stored as UTC midnight
+      })
+    : "—";
+
+// Deadline is date-only, so the job stays open through the end of that day
+const daysLeft = (deadline?: string | null): number | null => {
+  if (!deadline) return null;
+  return Math.ceil((new Date(deadline).getTime() + DAY - Date.now()) / DAY);
+};
+
+/* ---------------------------- UI pieces ---------------------------- */
+
+const cardStyle = {
+  border: "1px solid #E7E5E1",
+  boxShadow: "0 1px 2px rgba(11,31,51,0.04)",
+};
+
+function Card({
   children,
-  isEven,
+  accent = false,
+  className = "",
 }: {
-  label: string;
   children: React.ReactNode;
-  isEven: boolean;
+  accent?: boolean;
+  className?: string;
 }) {
   return (
-    <tr className={isEven ? "bg-gray-50" : "bg-white"}>
-      <td className="w-56 px-4 py-3 align-top text-sm font-semibold text-[#0B2E63]">
-        {label}
-      </td>
-      <td className="px-4 py-3 text-sm text-gray-700">{children}</td>
-    </tr>
+    <div
+      className={`overflow-hidden rounded-xl bg-white ${className}`}
+      style={cardStyle}
+    >
+      {accent && <div className="h-1" style={{ background: flameGradient }} />}
+      {children}
+    </div>
   );
 }
 
+function PageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen px-4 py-10" style={{ background: flame.paper }}>
+      <div className="mx-auto max-w-6xl">{children}</div>
+    </div>
+  );
+}
+
+function BackLink() {
+  return (
+    <Link
+      href="/jobs"
+      className="mb-5 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      Back to jobs
+    </Link>
+  );
+}
+
+function Badge({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "blue" | "green" | "amber" | "red";
+}) {
+  const tones = {
+    neutral: "bg-slate-100 text-slate-700",
+    blue: "bg-[#1C6FD9]/10 text-[#1C6FD9]",
+    green: "bg-emerald-50 text-emerald-700",
+    amber: "bg-[#F0862E]/10 text-[#C4661A]",
+    red: "bg-red-50 text-red-600",
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function Fact({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div
+        className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+        style={{ background: `${flame.core}14`, color: flame.core }}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {label}
+        </p>
+        <div className="mt-0.5 text-sm font-medium text-slate-900">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  text,
+  first = false,
+}: {
+  title: string;
+  text: string;
+  first?: boolean;
+}) {
+  return (
+    <section className={`px-6 py-6 sm:px-8 ${first ? "" : "border-t border-slate-200"}`}>
+      <h2
+        className="mb-3 text-sm font-bold uppercase tracking-wide"
+        style={{ color: flame.ink }}
+      >
+        {title}
+      </h2>
+      <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
+        {htmlToPlainText(text)}
+      </p>
+    </section>
+  );
+}
+
+function SideTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h3
+      className="mb-4 text-sm font-bold uppercase tracking-wide"
+      style={{ color: flame.ink }}
+    >
+      {children}
+    </h3>
+  );
+}
+
+function DocLink({ title, href }: { title: string; href: string }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer"
+      className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-white"
+      style={{ background: "#FBFBFA", border: "1px solid #E7E5E1" }}
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+        <span className="truncate text-sm font-medium text-slate-800">
+          {title}
+        </span>
+      </span>
+      <Download className="h-4 w-4 shrink-0 text-[#1C6FD9] group-hover:text-[#F0862E]" />
+    </a>
+  );
+}
+
+/* ------------------------------- Page ------------------------------ */
+
 export default function JobDetailsPage() {
   const params = useParams();
-  const [job, setJob] = useState<Job | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const id = params.id as string;
 
-  useEffect(() => {
-    const fetchJob = async () => {
-      try {
-        if (!params?.id) return;
-        const res = await axios.get(`/api/jobs/${params.id}`);
-        setJob(res.data.data);
-      } catch (err) {
-        setError("Failed to load job details.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchJob();
-  }, [params?.id]);
+  const {
+    data: apiData,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["job", id],
+    queryFn: () => getJob(id),
+  });
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-[#FFF9F0] px-4 py-8">
-        <div className="mx-auto max-w-4xl text-sm text-gray-500">Loading…</div>
-      </main>
+      <PageShell>
+        <Card accent>
+          <div className="animate-pulse space-y-4 p-8">
+            <div className="h-6 w-2/3 rounded bg-slate-200" />
+            <div className="h-4 w-1/3 rounded bg-slate-100" />
+            <div className="h-24 rounded bg-slate-100" />
+          </div>
+        </Card>
+      </PageShell>
     );
   }
 
-  if (error || !job) {
+  // Adjust if getJob returns the job directly instead of { data }
+  const job: Job | undefined = apiData?.data ?? apiData;
+
+  if (isError || !job) {
     return (
-      <main className="min-h-screen bg-[#FFF9F0] px-4 py-8">
-        <div className="mx-auto max-w-4xl text-sm text-red-500">
-          {error ?? "Job not found."}
-        </div>
-      </main>
+      <PageShell>
+        <BackLink />
+        <Card accent>
+          <p className="p-8 text-sm font-medium text-red-500">
+            Failed to load job details. It may not exist.
+          </p>
+        </Card>
+      </PageShell>
     );
   }
 
-  // Pre-filter standard rows to maintain predictable alternating row colors cleanly
-  const rows = [
-    { label: "Job Code", value: job.job_code },
-    { label: "Title", value: job.title },
-    ...(job.city?.map((city, idx) => ({
-      label: `City / Location #${idx + 1}`,
-      value: city,
-    })) || []),
-    { label: "Publication Date", value: formatDate(job.publication_date) },
-    { label: "Deadline", value: formatDate(job.deadline) },
-    job.age ? { label: "Age", value: job.age } : null,
-    job.qualification
-      ? {
-          label: "Qualification & Experience",
-          html: job.qualification,
-        }
-      : null,
-    job.skill
-      ? {
-          label: "Skills",
-          html: job.skill,
-        }
-      : null,
-    job.responsibility
-      ? {
-          label: "Responsibilities",
-          html: job.responsibility,
-        }
-      : null,
-    job.special_info
-      ? { label: "Special / Misc. Info", value: job.special_info }
-      : null,
-    job.doc1_attachment
-      ? {
-          label: job.doc1_title || "Document 1",
-          link: job.doc1_attachment,
-        }
-      : null,
-    job.doc2_attachment
-      ? {
-          label: job.doc2_title || "Document 2",
-          link: job.doc2_attachment,
-        }
-      : null,
-    { label: "Job Type", value: job.job_type },
-    job.email ? { label: "Email Address", value: job.email } : null,
-  ].filter(Boolean);
+  const left = daysLeft(job.deadline);
+  const open = left !== null && left > 0;
+  const cities = Array.isArray(job.cities) ? job.cities : [];
+  const requestedDocs = [job.req1DocTitle, job.req2DocTitle].filter(
+    Boolean,
+  ) as string[];
+  const attachments = [
+    { title: job.doc1Title || "Document 1", href: job.doc1Attachment },
+    { title: job.doc2Title || "Document 2", href: job.doc2Attachment },
+  ].filter((d) => d.href) as { title: string; href: string }[];
+
+  const sections = [
+    { title: "Qualification & Experience", text: job.qualification },
+    { title: "Skills", text: job.skill },
+    { title: "Responsibilities", text: job.responsibility },
+    { title: "Special / Misc. Info", text: job.specialInfo },
+  ].filter((s) => s.text && htmlToPlainText(s.text)) as {
+    title: string;
+    text: string;
+  }[];
 
   return (
-    <main className="min-h-screen bg-[#FFF9F0] px-4 py-8">
-      <div className="mx-auto max-w-4xl">
-        {/* Page header */}
-        <div className="mb-1 flex items-center gap-2 text-2xl font-bold text-[#0B2E63]">
-          <span className="text-[#F5A623]">▶</span> Job Details
-        </div>
-        <p className="mb-4 text-sm font-semibold text-gray-700">{job.title}</p>
+    <PageShell>
+      <BackLink />
 
-        {/* Detail table card */}
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
-          <table className="w-full border-collapse">
-            <tbody>
-              {rows.map((row, index) => (
-                <DetailRow key={index} label={row!.label} isEven={index % 2 === 0}>
-                  {row!.html ? (
-                    <div dangerouslySetInnerHTML={{ __html: row!.html }} />
-                  ) : row!.link ? (
-                    <a
-                      href={row!.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#0E7C7B] underline hover:text-[#0B6564]"
-                    >
-                      Download File
-                    </a>
-                  ) : (
-                    row!.value
-                  )}
-                </DetailRow>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Header card */}
+      <Card accent className="mb-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-6 sm:px-8">
+          <div className="flex min-w-0 items-start gap-4">
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg"
+              style={{ background: flameGradient }}
+            >
+              <Briefcase className="h-6 w-6 text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1
+                className="break-words text-2xl font-semibold"
+                style={{ color: flame.ink }}
+              >
+                {job.title}
+              </h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs font-semibold text-slate-500">
+                  {job.jobCode}
+                </span>
+                <Badge tone="blue">{job.jobType}</Badge>
+                <Badge tone={open ? (left! <= 3 ? "amber" : "green") : "red"}>
+                  {open
+                    ? left === 1
+                      ? "Closes today"
+                      : `${left} days left`
+                    : "Closed"}
+                </Badge>
+              </div>
+            </div>
+          </div>
 
-        {/* Actions */}
-        <div className="mt-6">
           <Link
-            href="/jobs"
-            className="inline-block rounded-lg bg-[#F5A623] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#D88900]"
+            href={`/jobs/${job.id}/edit`}
+            className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            style={{ background: flameGradient }}
           >
-            ← Back
+            <Pencil className="h-4 w-4" />
+            Edit job
           </Link>
         </div>
+      </Card>
+
+      {/* Body: description + sidebar */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        {/* Main column */}
+        <Card className="lg:col-span-2">
+          {sections.length > 0 ? (
+            sections.map((s, i) => (
+              <Section key={s.title} title={s.title} text={s.text} first={i === 0} />
+            ))
+          ) : (
+            <p className="p-8 text-sm text-slate-500">
+              No description has been added for this job.
+            </p>
+          )}
+        </Card>
+
+        {/* Sidebar */}
+        <aside className="space-y-6 lg:sticky lg:top-6">
+          <Card accent>
+            <div className="space-y-5 p-6">
+              <SideTitle>Job overview</SideTitle>
+              <Fact icon={CalendarDays} label="Published">
+                {formatDate(job.publicationDate)}
+              </Fact>
+              <Fact icon={Clock} label="Deadline">
+                {formatDate(job.deadline)}
+              </Fact>
+              <Fact icon={MapPin} label="Location">
+                {cities.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {cities.map((c) => (
+                      <Badge key={c}>{c}</Badge>
+                    ))}
+                  </div>
+                ) : (
+                  "—"
+                )}
+              </Fact>
+              {job.maxAge != null && (
+                <Fact icon={Users} label="Maximum age">
+                  {job.maxAge} years
+                </Fact>
+              )}
+              {job.email && (
+                <Fact icon={Mail} label="Apply by email">
+                  <a href={`mailto:${job.email}`}
+                    className="break-all text-[#1C6FD9] hover:text-[#F0862E] hover:underline"
+                  >
+                    {job.email}
+                  </a>
+                </Fact>
+              )}
+            </div>
+          </Card>
+
+          {attachments.length > 0 && (
+            <Card>
+              <div className="p-6">
+                <SideTitle>Attachments</SideTitle>
+                <div className="space-y-2">
+                  {attachments.map((d) => (
+                    <DocLink key={d.title + d.href} title={d.title} href={d.href} />
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {requestedDocs.length > 0 && (
+            <Card>
+              <div className="p-6">
+                <SideTitle>Required from applicants</SideTitle>
+                <ul className="space-y-2">
+                  {requestedDocs.map((d) => (
+                    <li
+                      key={d}
+                      className="flex items-start gap-2 text-sm text-slate-700"
+                    >
+                      <span
+                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ background: flame.edge }}
+                      />
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
+          )}
+        </aside>
       </div>
-    </main>
+    </PageShell>
   );
 }
