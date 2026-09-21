@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import {
-  findId,
   GetCities,
   GetCountries,
   GetExperiences,
@@ -32,6 +31,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import useUserProfile from "@/app/lib/fetchUserProfile";
 import { useSearchParams } from "next/navigation";
+import { findId } from "@/app/action/job";
 
 type TabId =
   | "photo"
@@ -473,18 +473,17 @@ interface PersonalTabProps {
 }
 function useFindingId() {
   const searchParams = useSearchParams();
-  const jobId = searchParams.get("jobId"); // "12" or null
+  const jobId = searchParams.get("jobId");
 
-  const { data: ids = [], isLoading } = useQuery({
-    queryKey: ["loading_ids"],
-    queryFn: findId,
-    enabled: !!jobId, // only call the API when the URL has ?jobId=
+  const { data: job, isLoading } = useQuery({
+    queryKey: ["loading_id", jobId],
+    queryFn: () => findId(jobId as string),
+    enabled: Boolean(jobId),
   });
 
-  // works for [1, 2, 3] and for [{ id: 1 }, { id: 2 }]
-  const exists = ids.some((x: any) => String(x?.id ?? x) === jobId);
+  const exists = job != null;
 
-  return { jobId, exists, isLoading };
+  return { jobId, job, exists, isLoading };
 }
 function PersonalTab({
   formData,
@@ -492,11 +491,6 @@ function PersonalTab({
   errors,
   setFormData,
 }: PersonalTabProps) {
-  const { jobId, exists, isLoading } = useFindingId();
-  // const fetchUserProfile = async () => {
-  //   const res = await axios.get("/api/user_profile", { withCredentials: true });
-  //   return res.data.profile;
-  // };
   const {
     data: profile,
     isLoading: isLoadingProfile,
@@ -1812,6 +1806,7 @@ export default function ProfileTabs() {
   // -------------------------------------------------------------------------
   // Validation — every field on the currently active tab is checked.
   // -------------------------------------------------------------------------
+
   function validate() {
     const newErrors: Record<string, string> = {};
 
@@ -2203,6 +2198,11 @@ export default function ProfileTabs() {
       setErrors((prev) => ({ ...prev, image: "" }));
     }
   }
+
+  const { jobId, job, exists, isLoading } = useFindingId();
+   if(!jobId && !job){
+    return "jrijeoj"
+   }
 
   // Generic helpers for the four repeatable-entry tabs -----------------------
 

@@ -25,21 +25,6 @@ export const GET = async (req: NextRequest) => {
         });
         return NextResponse.json({ success: true, data });
       }
-      case "id": {
-        const id = Number(searchParams.get("id"));
-
-        // not a valid number -> not found
-        if (!Number.isInteger(id) || id <= 0) {
-          return NextResponse.json({ success: true, exists: false });
-        }
-
-        const job = await prisma.job.findUnique({
-          where: { id },
-          select: { id: true, title: true, jobCode: true },
-        });
-
-        return NextResponse.json({ success: true, exists: !!job, data: job });
-      }
       default:
         return NextResponse.json(
           { success: false, message: "Invalid or missing 'type' parameter" },

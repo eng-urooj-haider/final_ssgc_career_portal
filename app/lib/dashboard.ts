@@ -1,6 +1,6 @@
-import axios from "axios";
-import prisma from "./db";
 
+
+import axios from "axios";
 export const UserProfile = () => {
   const user = axios.get("api/user_profile", { withCredentials: true });
   return user;
@@ -18,24 +18,26 @@ export const GetExperiences = async () => {
   return res.data.experiences;
 };
 export async function getQualificationGroups() {
-  const res = await axios.get("/api/lookups?type=qualification-groups" , { withCredentials: true });
-  console.log('res' ,res.data)
+  const res = await axios.get("/api/lookups?type=qualification-groups", {
+    withCredentials: true,
+  });
+  console.log("res", res.data);
   return res.data.data;
 }
 
 export async function getQualifications() {
-  const res = await axios.get("/api/lookups?type=qualifications" , { withCredentials: true });
-  console.log('res' ,res.data)
+  const res = await axios.get("/api/lookups?type=qualifications", {
+    withCredentials: true,
+  });
+  console.log("res", res.data);
   return res.data.data;
 }
 
 export async function getInstitutes() {
-  const res = await axios.get("/api/lookups?type=institutes" , { withCredentials: true });
-  console.log('res' ,res.data)
+  const res = await axios.get("/api/lookups?type=institutes", {
+    withCredentials: true,
+  });
+  console.log("res", res.data);
   return res.data.data;
 }
-export async function findId() {
-  const res = await axios.get("/api/lookups?type=id" , { withCredentials: true });
-  console.log('res' ,res.data)
-  return res.data.data;
-}
+
