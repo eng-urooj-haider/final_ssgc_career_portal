@@ -32,6 +32,7 @@ import { useQuery } from "@tanstack/react-query";
 import useUserProfile from "@/app/lib/fetchUserProfile";
 import { useSearchParams } from "next/navigation";
 import { findId } from "@/app/action/job";
+import { ProgressBar } from "@/app/components/ProgressBar";
 
 type TabId =
   | "photo"
@@ -526,11 +527,11 @@ function PersonalTab({
   }, [profile]);
   return (
     <div>
-      {jobId && !isLoading && !exists && (
+      {/* {jobId && !isLoading && !exists && (
         <p className="mb-4 text-sm font-medium text-red-600">
           This job link is invalid.
         </p>
-      )}
+      )} */}
       <SectionHeading
         title="Personal details"
         description="This information is used across your applications."
@@ -1802,7 +1803,6 @@ export default function ProfileTabs() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<ProfileFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
   // -------------------------------------------------------------------------
   // Validation — every field on the currently active tab is checked.
   // -------------------------------------------------------------------------
@@ -2199,11 +2199,6 @@ export default function ProfileTabs() {
     }
   }
 
-  const { jobId, job, exists, isLoading } = useFindingId();
-   if(!jobId && !job){
-    return "jrijeoj"
-   }
-
   // Generic helpers for the four repeatable-entry tabs -----------------------
 
   // FIX: previously always hit "/api/experiences/${id}" regardless of which
@@ -2287,6 +2282,7 @@ export default function ProfileTabs() {
     emptyCertificate,
   );
   const membershipsHandlers = makeEntryHandlers("memberships", emptyMembership);
+  const { data: profile } = useUserProfile();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -2400,12 +2396,16 @@ export default function ProfileTabs() {
       setSaving(false);
     }
   }
-
+  const { jobId, job, exists, isLoading } = useFindingId();
+  console.log(job?.profileCompletion);
+  const  progressCount = job?.profileCompletion.id == 5 ? profile?.experience
   return (
     <div
       className="min-h-screen py-10 px-4"
       style={{ background: flame.paper }}
     >
+      {jobId && <ProgressBar progress={progressCount} />}
+
       <div className="max-w-7xl mx-auto">
         <div className="mb-6 flex items-center gap-3">
           <div
