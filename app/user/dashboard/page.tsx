@@ -1796,16 +1796,78 @@ const initialFormData: ProfileFormData = {
   certificates: [emptyCertificate(1)],
   memberships: [emptyMembership(1)],
 };
+import { useMemo } from "react";
 
+export function calculateProfileProgress(job, profile) {
+  // Return 0 if either object is missing
+  if (!job?.profileCompletion || !profile) return 0;
+
+  const rules = job.profileCompletion;
+  const totalRequired = Number(rules.count) || 0;
+
+  if (totalRequired === 0) return 0;
+
+  let completedCount = 0;
+
+  // 1. Image Check
+  if (rules.image && Boolean(profile.userPic)) {
+    completedCount++;
+  }
+
+  // 2. Personal Detail Check (Checking core required field like fatherName/CNIC/mobile)
+  if (rules.personal && Boolean(profile.fatherName || profile.cnic)) {
+    completedCount++;
+  }
+
+  // 3. Experience Check (Array must exist and have at least 1 record)
+  if (
+    rules.experience &&
+    Array.isArray(profile.experiences) &&
+    profile.experiences.length > 0
+  ) {
+    completedCount++;
+  }
+
+  // 4. Education Check (Array must exist and have at least 1 record)
+  if (
+    rules.education &&
+    Array.isArray(profile.education) &&
+    profile.education.length > 0
+  ) {
+    completedCount++;
+  }
+
+  // 5. Certificate Check (Array must exist and have at least 1 record)
+  if (
+    rules.certificate &&
+    Array.isArray(profile.certificates) &&
+    profile.certificates.length > 0
+  ) {
+    completedCount++;
+  }
+
+  // 6. Membership Check (Array must exist and have at least 1 record)
+  if (
+    rules.membership &&
+    Array.isArray(profile.memberships) &&
+    profile.memberships.length > 0
+  ) {
+    completedCount++;
+  }
+
+  // Calculate percentage
+  return Math.round((completedCount / totalRequired) * 100);
+}
 export default function ProfileTabs() {
   const [activeTab, setActiveTab] = useState<TabId>("photo");
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<ProfileFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // -------------------------------------------------------------------------
-  // Validation — every field on the currently active tab is checked.
-  // -------------------------------------------------------------------------
+
+  const { data: profile } = useUserProfile();
+  const { jobId, job, exists, isLoading } = useFindingId();
+  const progressPercentage = calculateProfileProgress(job, profile);
 
   function validate() {
     const newErrors: Record<string, string> = {};
@@ -1880,8 +1942,6 @@ export default function ProfileTabs() {
         newErrors.mobile_number = "Enter a valid 7-digit mobile number";
       }
 
-      // Home phone is optional. Only validate format once the person has
-      // started filling either half of it in.
       const homePrefixTrimmed = formData.home_prefix?.trim() || "";
       const homeNumberTrimmed = formData.home_number?.trim() || "";
       if (homePrefixTrimmed || homeNumberTrimmed) {
@@ -1977,7 +2037,7 @@ export default function ProfileTabs() {
           newErrors[`${entry.id}_reason`] = "Reason is required";
         }
         if (entry.city === "other" && !entry.city_other?.trim()) {
-          newErrors.city_other = "Please specify your experience city";
+          newErrors[`${entry.id}_city_other`] = "Please specify your experience city";
         }
       });
     }
@@ -2105,9 +2165,6 @@ export default function ProfileTabs() {
           newErrors[`${entry.id}_issue_date`] = "Issue date is required";
         }
         if (!entry.document) {
-          // FIX: this previously wrote to `${entry.id}_issue_date`, which
-          // clobbered any real issue-date error and never showed under the
-          // document field (which reads `${entry.id}_document`).
           newErrors[`${entry.id}_document`] = "Document is required";
         }
       });
@@ -2123,7 +2180,7 @@ export default function ProfileTabs() {
             "Membership Type is required";
         }
         if (!entry.member_since.trim()) {
-          newErrors[`${entry.id}_member_since`] = "Member Since  is required";
+          newErrors[`${entry.id}_member_since`] = "Member Since is required";
         }
       });
     }
@@ -2132,9 +2189,6 @@ export default function ProfileTabs() {
     return Object.keys(newErrors).length === 0;
   }
 
-  // Fields where only digits should ever be typeable — this stops a person
-  // from pasting/typing letters into a phone number in the first place,
-  // rather than only flagging it after they hit Save.
   const DIGITS_ONLY_FIELDS = new Set([
     "mobile_prefix",
     "mobile_number",
@@ -2145,7 +2199,6 @@ export default function ProfileTabs() {
     "ssgc_employee_number",
   ]);
 
-  // Fields restricted to human-name characters as the person types.
   const NAME_ONLY_FIELDS = new Set(["father_name", "ssgc_employee_name"]);
 
   function sanitizeValue(name: string, value: string): string {
@@ -2199,11 +2252,6 @@ export default function ProfileTabs() {
     }
   }
 
-  // Generic helpers for the four repeatable-entry tabs -----------------------
-
-  // FIX: previously always hit "/api/experiences/${id}" regardless of which
-  // tab's entry was being deleted, so removing a saved education,
-  // certificate, or membership record never actually deleted it server-side.
   const DELETE_ENDPOINTS: Record<
     "experience" | "education" | "certificates" | "memberships",
     string
@@ -2255,10 +2303,7 @@ export default function ProfileTabs() {
           return { ...prev, [key]: list.filter((entry) => entry.id !== id) };
         });
 
-        // Only call the API if this was a persisted (existing) record.
-        // Freshly added local-only entries use Date.now() as their id and
-        // were never saved, so there's nothing to delete on the server.
-        const isPersistedId = id < 10_000_000_000; // adjust threshold as needed, or track this explicitly
+        const isPersistedId = id < 10_000_000_000;
         if (!isPersistedId) return;
 
         try {
@@ -2268,8 +2313,6 @@ export default function ProfileTabs() {
         } catch (err) {
           console.error(`Failed to delete ${key} entry`, err);
           alert("Something went wrong while deleting. Please try again.");
-          // Optionally: re-fetch or re-add the entry back to formData here,
-          // since the local state and DB are now out of sync.
         }
       },
     };
@@ -2282,7 +2325,6 @@ export default function ProfileTabs() {
     emptyCertificate,
   );
   const membershipsHandlers = makeEntryHandlers("memberships", emptyMembership);
-  const { data: profile } = useUserProfile();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -2328,9 +2370,7 @@ export default function ProfileTabs() {
           await axios.patch(
             "/api/profile",
             { experience: formData.experience },
-            {
-              withCredentials: true,
-            },
+            { withCredentials: true },
           );
           break;
         }
@@ -2338,9 +2378,7 @@ export default function ProfileTabs() {
           await axios.patch(
             "/api/profile",
             { education: formData.education },
-            {
-              withCredentials: true,
-            },
+            { withCredentials: true },
           );
           break;
         }
@@ -2377,9 +2415,7 @@ export default function ProfileTabs() {
           await axios.patch(
             "/api/profile",
             { memberships: formData.memberships },
-            {
-              withCredentials: true,
-            },
+            { withCredentials: true },
           );
           break;
         }
@@ -2396,15 +2432,38 @@ export default function ProfileTabs() {
       setSaving(false);
     }
   }
-  const { jobId, job, exists, isLoading } = useFindingId();
-  console.log(job?.profileCompletion);
-  const  progressCount = job?.profileCompletion.id == 5 ? profile?.experience
+
+  if (jobId && isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: flame.paper }}>
+        <p className="text-slate-600 font-medium">Verifying Job ID...</p>
+      </div>
+    );
+  }
+
+  if (jobId && !exists) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: flame.paper }}>
+        <div className="bg-white p-8 rounded-xl border border-slate-200 text-center max-w-md shadow-sm">
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Invalid Job ID</h2>
+          <p className="text-slate-500 text-sm mb-6">
+            The Job ID specified in the URL is invalid or has expired. Please check the link and try again.
+          </p>
+          <a
+            href="/profile"
+            className="inline-block px-5 py-2.5 rounded-md text-white text-sm font-medium transition-opacity hover:opacity-90"
+            style={{ background: flameGradient }}
+          >
+            Go to General Profile
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className="min-h-screen py-10 px-4"
-      style={{ background: flame.paper }}
-    >
-      {jobId && <ProgressBar progress={progressCount} />}
+    <div className="min-h-screen py-10 px-4" style={{ background: flame.paper }}>
+      {jobId && exists && <ProgressBar progress={progressPercentage} />}
 
       <div className="max-w-7xl mx-auto">
         <div className="mb-6 flex items-center gap-3">
@@ -2412,11 +2471,7 @@ export default function ProfileTabs() {
             className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
             style={{ background: flameGradient }}
           >
-            <Flame
-              className="w-5 h-5 text-white"
-              fill="white"
-              fillOpacity={0.25}
-            />
+            <Flame className="w-5 h-5 text-white" fill="white" fillOpacity={0.25} />
           </div>
           <div>
             <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
@@ -2437,15 +2492,8 @@ export default function ProfileTabs() {
         >
           <div className="h-1" style={{ background: flameGradient }} />
 
-          <div
-            className="border-b overflow-x-auto"
-            style={{ borderColor: "#E7E5E1" }}
-          >
-            <nav
-              className="flex min-w-max gap-1 px-2"
-              role="tablist"
-              aria-label="Profile sections"
-            >
+          <div className="border-b overflow-x-auto" style={{ borderColor: "#E7E5E1" }}>
+            <nav className="flex min-w-max gap-1 px-2" role="tablist" aria-label="Profile sections">
               {TABS.map((tab, index) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
@@ -2462,9 +2510,7 @@ export default function ProfileTabs() {
                       fontWeight: isActive ? 700 : 600,
                       background: isActive ? "#F8FAFC" : "transparent",
                       borderRight:
-                        index !== TABS.length - 1
-                          ? "1px solid #E2E8F0"
-                          : "none",
+                        index !== TABS.length - 1 ? "1px solid #E2E8F0" : "none",
                     }}
                   >
                     <Icon className="w-4 h-4" />
@@ -2537,9 +2583,7 @@ export default function ProfileTabs() {
           >
             <div>
               {submitError && (
-                <p className="text-sm font-medium text-rose-600">
-                  {submitError}
-                </p>
+                <p className="text-sm font-medium text-rose-600">{submitError}</p>
               )}
             </div>
             <div className="flex items-center gap-3">
