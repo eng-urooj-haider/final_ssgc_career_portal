@@ -28,7 +28,7 @@ import {
   getQualificationGroups,
   getQualifications,
 } from "@/app/lib/dashboard";
-import { useQuery } from "@tanstack/react-query";
+import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import useUserProfile from "@/app/lib/fetchUserProfile";
 import { useSearchParams } from "next/navigation";
 import { findId } from "@/app/action/job";
@@ -945,7 +945,7 @@ function ExperienceTab({
   }
 
   React.useEffect(() => {
-    if (experience && experience.length > 0) {
+    if (experience && experience?.length > 0) {
       setFormData((prev) => ({
         ...prev,
         experience: experience.map((exp: any, index: number) => ({
@@ -975,7 +975,7 @@ function ExperienceTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            removeDisabled={entries?.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1413,7 +1413,7 @@ export function EducationTab({
   const profileEducation = profile?.education;
 
   React.useEffect(() => {
-    if (profileEducation && profileEducation.length > 0) {
+    if (profileEducation && profileEducation?.length > 0) {
       setFormData((prev: any) => ({
         ...prev,
         education: profileEducation.map((edu: any, index: number) => ({
@@ -1450,7 +1450,7 @@ export function EducationTab({
             entry={entry}
             onFieldChange={onFieldChange}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            removeDisabled={entries?.length === 1}
             errors={errors}
             qualificationGroups={qualificationGroups}
             institutes={institutes}
@@ -1548,7 +1548,7 @@ export function CertificatesTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            removeDisabled={entries?.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1682,7 +1682,7 @@ function MembershipsTab({
   const { data: profile } = useUserProfile();
   const memberships = profile?.memberships;
   React.useEffect(() => {
-    if (memberships && memberships.length > 0) {
+    if (memberships && memberships?.length > 0) {
       setFormData((prev: any) => ({
         ...prev,
         memberships: memberships.map((edu: any, index: number) => ({
@@ -1706,7 +1706,7 @@ function MembershipsTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            removeDisabled={entries?.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1823,7 +1823,7 @@ export function calculateProfileProgress(job, profile) {
   if (
     rules.experience &&
     Array.isArray(profile.experiences) &&
-    profile.experiences.length > 0
+    profile.experiences?.length > 0
   ) {
     completedCount++;
   }
@@ -1832,7 +1832,7 @@ export function calculateProfileProgress(job, profile) {
   if (
     rules.education &&
     Array.isArray(profile.education) &&
-    profile.education.length > 0
+    profile.education?.length > 0
   ) {
     completedCount++;
   }
@@ -1841,7 +1841,7 @@ export function calculateProfileProgress(job, profile) {
   if (
     rules.certificate &&
     Array.isArray(profile.certificates) &&
-    profile.certificates.length > 0
+    profile.certificates?.length > 0
   ) {
     completedCount++;
   }
@@ -1850,7 +1850,7 @@ export function calculateProfileProgress(job, profile) {
   if (
     rules.membership &&
     Array.isArray(profile.memberships) &&
-    profile.memberships.length > 0
+    profile.memberships?.length > 0
   ) {
     completedCount++;
   }
@@ -1864,10 +1864,14 @@ export default function ProfileTabs() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<ProfileFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const QueryClient = useQueryClient();
 
   const { data: profile } = useUserProfile();
   const { jobId, job, exists, isLoading } = useFindingId();
-  const progressPercentage = calculateProfileProgress(job, profile);
+  const progressPercentage = useMemo(
+    () => calculateProfileProgress(job, profile),
+    [job, profile],
+  );
 
   function validate() {
     const newErrors: Record<string, string> = {};
@@ -1882,7 +1886,7 @@ export default function ProfileTabs() {
       const fatherName = formData.father_name?.trim() || "";
       if (!fatherName) {
         newErrors.father_name = "Father's / Husband's name is required";
-      } else if (fatherName.length < 3) {
+      } else if (fatherName?.length < 3) {
         newErrors.father_name = "Name must be at least 3 characters";
       } else if (!NAME_REGEX.test(fatherName)) {
         newErrors.father_name = "Name can only contain letters";
@@ -1927,7 +1931,7 @@ export default function ProfileTabs() {
       const domicile = formData.domicile?.trim() || "";
       if (!domicile) {
         newErrors.domicile = "Domicile is required";
-      } else if (domicile.length < 2) {
+      } else if (domicile?.length < 2) {
         newErrors.domicile = "Domicile looks too short";
       }
 
@@ -1972,14 +1976,14 @@ export default function ProfileTabs() {
       const currentAddress = formData.current_address?.trim() || "";
       if (!currentAddress) {
         newErrors.current_address = "Current address is required";
-      } else if (currentAddress.length < 10) {
+      } else if (currentAddress?.length < 10) {
         newErrors.current_address = "Please provide a more complete address";
       }
 
       const permanentAddress = formData.permanent_address?.trim() || "";
       if (!permanentAddress) {
         newErrors.permanent_address = "Permanent address is required";
-      } else if (permanentAddress.length < 10) {
+      } else if (permanentAddress?.length < 10) {
         newErrors.permanent_address = "Please provide a more complete address";
       }
 
@@ -2037,7 +2041,8 @@ export default function ProfileTabs() {
           newErrors[`${entry.id}_reason`] = "Reason is required";
         }
         if (entry.city === "other" && !entry.city_other?.trim()) {
-          newErrors[`${entry.id}_city_other`] = "Please specify your experience city";
+          newErrors[`${entry.id}_city_other`] =
+            "Please specify your experience city";
         }
       });
     }
@@ -2050,7 +2055,7 @@ export default function ProfileTabs() {
         return String(val).trim();
       };
 
-      if (!formData.education || formData.education.length === 0) {
+      if (!formData.education || formData.education?.length === 0) {
         newErrors["education_general"] =
           "At least one education entry is required";
       } else {
@@ -2186,7 +2191,7 @@ export default function ProfileTabs() {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors)?.length === 0;
   }
 
   const DIGITS_ONLY_FIELDS = new Set([
@@ -2299,7 +2304,7 @@ export default function ProfileTabs() {
 
         setFormData((prev) => {
           const list = prev[key] as any[];
-          if (list.length === 1) return prev;
+          if (list?.length === 1) return prev;
           return { ...prev, [key]: list.filter((entry) => entry.id !== id) };
         });
 
@@ -2405,10 +2410,10 @@ export default function ProfileTabs() {
             withCredentials: true,
           });
 
-          setFormData((prev) => ({
-            ...prev,
-            certificates: res.data.certificates,
-          }));
+          // setFormData((prev) => ({
+          //   ...prev,
+          //   certificates: res.data.certificates,
+          // }));
           break;
         }
         case "memberships": {
@@ -2423,7 +2428,7 @@ export default function ProfileTabs() {
         default:
           break;
       }
-
+      await QueryClient.invalidateQueries({ queryKey: ["profile_data"] });
       alert("Saved successfully!");
     } catch (err) {
       console.error("Submission failed", err);
@@ -2435,7 +2440,10 @@ export default function ProfileTabs() {
 
   if (jobId && isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: flame.paper }}>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: flame.paper }}
+      >
         <p className="text-slate-600 font-medium">Verifying Job ID...</p>
       </div>
     );
@@ -2443,11 +2451,17 @@ export default function ProfileTabs() {
 
   if (jobId && !exists) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: flame.paper }}>
+      <div
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{ background: flame.paper }}
+      >
         <div className="bg-white p-8 rounded-xl border border-slate-200 text-center max-w-md shadow-sm">
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Invalid Job ID</h2>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">
+            Invalid Job ID
+          </h2>
           <p className="text-slate-500 text-sm mb-6">
-            The Job ID specified in the URL is invalid or has expired. Please check the link and try again.
+            The Job ID specified in the URL is invalid or has expired. Please
+            check the link and try again.
           </p>
           <a
             href="/profile"
@@ -2462,8 +2476,13 @@ export default function ProfileTabs() {
   }
 
   return (
-    <div className="min-h-screen py-10 px-4" style={{ background: flame.paper }}>
-      {jobId && exists && <ProgressBar progress={progressPercentage} />}
+    <div
+      className="min-h-screen py-10 px-4"
+      style={{ background: flame.paper }}
+    >
+      {jobId && exists && progressPercentage != 0 && (
+        <ProgressBar progress={progressPercentage} />
+      )}
 
       <div className="max-w-7xl mx-auto">
         <div className="mb-6 flex items-center gap-3">
@@ -2471,7 +2490,11 @@ export default function ProfileTabs() {
             className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
             style={{ background: flameGradient }}
           >
-            <Flame className="w-5 h-5 text-white" fill="white" fillOpacity={0.25} />
+            <Flame
+              className="w-5 h-5 text-white"
+              fill="white"
+              fillOpacity={0.25}
+            />
           </div>
           <div>
             <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
@@ -2492,8 +2515,15 @@ export default function ProfileTabs() {
         >
           <div className="h-1" style={{ background: flameGradient }} />
 
-          <div className="border-b overflow-x-auto" style={{ borderColor: "#E7E5E1" }}>
-            <nav className="flex min-w-max gap-1 px-2" role="tablist" aria-label="Profile sections">
+          <div
+            className="border-b overflow-x-auto"
+            style={{ borderColor: "#E7E5E1" }}
+          >
+            <nav
+              className="flex min-w-max gap-1 px-2"
+              role="tablist"
+              aria-label="Profile sections"
+            >
               {TABS.map((tab, index) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
@@ -2510,7 +2540,9 @@ export default function ProfileTabs() {
                       fontWeight: isActive ? 700 : 600,
                       background: isActive ? "#F8FAFC" : "transparent",
                       borderRight:
-                        index !== TABS.length - 1 ? "1px solid #E2E8F0" : "none",
+                        index !== TABS?.length - 1
+                          ? "1px solid #E2E8F0"
+                          : "none",
                     }}
                   >
                     <Icon className="w-4 h-4" />
@@ -2583,7 +2615,9 @@ export default function ProfileTabs() {
           >
             <div>
               {submitError && (
-                <p className="text-sm font-medium text-rose-600">{submitError}</p>
+                <p className="text-sm font-medium text-rose-600">
+                  {submitError}
+                </p>
               )}
             </div>
             <div className="flex items-center gap-3">
