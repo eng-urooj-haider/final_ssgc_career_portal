@@ -28,7 +28,11 @@ import {
   getQualificationGroups,
   getQualifications,
 } from "@/app/lib/dashboard";
-import { useQuery } from "@tanstack/react-query";
+import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
+import useUserProfile from "@/app/lib/fetchUserProfile";
+import { useSearchParams } from "next/navigation";
+import { findId } from "@/app/action/job";
+import { ProgressBar } from "@/app/components/ProgressBar";
 
 type TabId =
   | "photo"
@@ -71,12 +75,8 @@ const TABS: TabDef[] = [
 const NAME_REGEX = /^[A-Za-z\s.'-]+$/;
 const CNIC_REGEX = /^\d{13}$/;
 // Local Pakistani dialing code, e.g. "021" (landline) or "0300" (mobile network).
-// NOTE: previously this required a leading "+" (e.g. "+92"), which could never
-// match the "03xx" placeholder or the 4-character maxLength on the input.
 const PREFIX_REGEX = /^0\d{2,3}$/;
 // 7-digit subscriber number that follows the mobile prefix (e.g. 0300-1234567).
-// Previously this required exactly 10 digits while the input was capped at
-// maxLength=7, so the field could never be filled in a way that validated.
 const MOBILE_REGEX = /^\d{7}$/;
 const LANDLINE_REGEX = /^\d{6,8}$/;
 const YEAR_REGEX = /^(19|20)\d{2}$/;
@@ -185,7 +185,10 @@ interface FormSelectFieldProps extends FieldProps {
   placeholder?: string;
   isLoading?: boolean;
 }
-function FlameSelect(props) {
+
+// FIX: props were previously untyped (implicit `any`), which silently
+// swallowed type errors on every usage of this component.
+function FlameSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
@@ -222,6 +225,11 @@ function FormSelectField({
             {opt.label}
           </option>
         ))}
+        {label !== "Country" && (
+          <option key="other" value="other">
+            Other
+          </option>
+        )}
       </FlameSelect>
     </Field>
   );
@@ -272,13 +280,13 @@ function LocationSelects({
   const countryOptions = countries.map(
     (c: { id: number; countryName: string }) => ({
       label: c.countryName,
-      value: c.countryName,
+      value: c.id,
     }),
   );
 
   const cityOptions = cities.map((c: { id: number; cityName: string }) => ({
     label: c.cityName,
-    value: c.cityName,
+    value: c.id,
   }));
 
   return (
@@ -335,26 +343,29 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
     }
   }
 
-  const fetchUserProfile = async () => {
-    const res = await axios.get("/api/user_profile", { withCredentials: true });
-    return res.data.profile;
-  };
+  // const fetchUserProfile = async () => {
+  //   const res = await axios.get("/api/user_profile", { withCredentials: true });
+  //   return res.data.profile;
+  // };
 
+  // const {
+  //   data: profile,
+  //   isLoading: isLoadingProfile,
+  //   isError: isProfileError,
+  // } = useQuery({
+  //   queryKey: ["profile_pic"],
+  //   queryFn: fetchUserProfile,
+  // });
   const {
     data: profile,
     isLoading: isLoadingProfile,
     isError: isProfileError,
-  } = useQuery({
-    queryKey: ["profile_pic"],
-    queryFn: fetchUserProfile,
-  });
-
+  } = useUserProfile();
   React.useEffect(() => {
-    if (profile?.user_pic && !hasLocalSelection) {
-      setPreview(profile.user_pic);
+    if (profile?.userPic && !hasLocalSelection) {
+      setPreview(profile.userPic);
     }
   }, [profile, hasLocalSelection]);
-
   React.useEffect(() => {
     return () => {
       if (preview?.startsWith("blob:")) {
@@ -414,11 +425,11 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
                 Loading current photo…
               </p>
             )}
-            {isProfileError && !hasLocalSelection && (
+            {/* {isProfileError && !hasLocalSelection && (
               <p className="mt-1 text-xs text-red-400">
                 Couldn't load your current photo.
               </p>
-            )}
+            )} */}
           </div>
         </div>
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
@@ -439,8 +450,6 @@ interface PersonalFormData {
   birth_country: string;
   birth_city: string;
   birth_city_other: string;
-  // is_pakistani: string;
-  // cnic: string;
   passport_no: string;
   domicile: string;
   mobile_prefix: string;
@@ -460,55 +469,69 @@ interface PersonalTabProps {
   formData: PersonalFormData;
   onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   errors: Record<string, string>;
+  // FIX: this prop was used in the component body but never declared here.
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
+function useFindingId() {
+  const searchParams = useSearchParams();
+  const jobId = searchParams.get("jobId");
 
+  const { data: job, isLoading } = useQuery({
+    queryKey: ["loading_id", jobId],
+    queryFn: () => findId(jobId as string),
+    enabled: Boolean(jobId),
+  });
+
+  const exists = job != null;
+
+  return { jobId, job, exists, isLoading };
+}
 function PersonalTab({
   formData,
   onChange,
   errors,
   setFormData,
 }: PersonalTabProps) {
-  const fetchUserProfile = async () => {
-    const res = await axios.get("/api/user_profile", { withCredentials: true });
-    return res.data.profile;
-  };
   const {
     data: profile,
     isLoading: isLoadingProfile,
     isError: isProfileError,
-  } = useQuery({
-    queryKey: ["profile_data"],
-    queryFn: fetchUserProfile,
-  });
+  } = useUserProfile();
+
   React.useEffect(() => {
     if (profile) {
       setFormData((prev) => ({
         ...prev,
-        father_name: profile.father_name ?? "",
-        marital_status: profile.marital_status ?? "",
-        children: profile.children ?? "",
-        date_of_birth: profile.date_of_birth ?? "",
-        birth_country: profile.birth_country ?? "",
-        birth_city: profile.birth_city ?? "",
-        birth_city_other: profile.birth_city_other ?? "",
-        passport_no: profile.passport_no ?? "",
+        father_name: profile.fatherName ?? "",
+        marital_status: profile.maritalStatus ?? "",
+        children: profile.childrenCount ?? 0,
+        date_of_birth: profile.dateOfBirth ?? "",
+        birth_country: profile.birthCountryId ?? "",
+        birth_city: profile.birthCityId ?? "",
+        birth_city_other: profile.birthCityOther ?? "",
+        passport_no: profile.passportNo ?? "",
         domicile: profile.domicile ?? "",
-        mobile_prefix: profile.mobile_prefix ?? "",
-        mobile_number: profile.mobile_number ?? "",
-        home_prefix: profile.home_prefix ?? "",
-        home_number: profile.home_number ?? "",
-        office_prefix: profile.office_prefix ?? "",
-        office_number: profile.office_number ?? "",
-        current_address: profile.current_address ?? "",
-        permanent_address: profile.permanent_address ?? "",
-        already_worked_ssgc: profile.already_worked_ssgc ?? "",
-        ssgc_employee_name: profile.ssgc_employee_name ?? "",
-        ssgc_employee_number: profile.ssgc_employee_number ?? "",
+        mobile_prefix: profile.mobilePrefix ?? "",
+        mobile_number: profile.mobileNumber ?? "",
+        home_prefix: profile.homePrefix ?? "",
+        home_number: profile.homeNumber ?? "",
+        office_prefix: profile.officePrefix ?? "",
+        office_number: profile.officeNumber ?? "",
+        current_address: profile.currentAddress ?? "",
+        permanent_address: profile.permanentAddress ?? "",
+        already_worked_ssgc: profile.alreadyWorkedSsgc == true ? "Yes" : "No",
+        ssgc_employee_name: profile.ssgcEmployeeName ?? "",
+        ssgc_employee_number: profile.ssgcEmployeeNumber ?? "",
       }));
     }
   }, [profile]);
   return (
     <div>
+      {/* {jobId && !isLoading && !exists && (
+        <p className="mb-4 text-sm font-medium text-red-600">
+          This job link is invalid.
+        </p>
+      )} */}
       <SectionHeading
         title="Personal details"
         description="This information is used across your applications."
@@ -536,16 +559,15 @@ function PersonalTab({
             className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
           >
             <option value="">Select status</option>
-            <option value="Single">Single</option>
-            <option value="Married">Married</option>
-            <option value="Other">Other</option>
+            <option value="SINGLE">Single</option>
+            <option value="MARRIED">Married</option>
           </select>
         </Field>
 
         <Field label="No. of Children" required error={errors.children}>
           <select
             name="children"
-            value={formData.children || ""}
+            value={formData.children || 0}
             onChange={onChange}
             className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
           >
@@ -593,34 +615,6 @@ function PersonalTab({
             />
           </Field>
         )}
-
-        {/* <Field label="Is Pakistani?" required error={errors.is_pakistani}>
-          <select
-            name="is_pakistani"
-            value={formData.is_pakistani || ""}
-            onChange={onChange}
-            className="w-full rounded-md border border-gray-300 p-2 text-sm text-black"
-          >
-            <option value="">Select</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </Field> */}
-
-        {/* Only one of CNIC / Passport applies, depending on citizenship. */}
-        {/* {formData.is_pakistani === "Yes" && (
-          <Field label="CNIC" required error={errors.cnic}>
-            <FlameInput
-              name="cnic"
-              value={formData.cnic || ""}
-              onChange={onChange}
-              placeholder="0000000000000"
-              maxLength={13}
-              type="tel"
-              inputMode="numeric"
-            />
-          </Field>
-        )} */}
 
         <Field label="Passport Number" required error={errors.passport_no}>
           <FlameInput
@@ -888,10 +882,6 @@ function AddButton({ onClick, label }: AddButtonProps) {
 // Experience tab (lifted into shared state)
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Experience tab (lifted into shared state)
-// ---------------------------------------------------------------------------
-
 interface ExperienceEntry {
   id: number;
   job_title: string;
@@ -903,6 +893,7 @@ interface ExperienceEntry {
   salary: string;
   responsibilities: string;
   reason: string;
+  city_other: string;
 }
 
 const emptyExperience = (id: number): ExperienceEntry => ({
@@ -916,6 +907,7 @@ const emptyExperience = (id: number): ExperienceEntry => ({
   salary: "",
   responsibilities: "",
   reason: "",
+  city_other: "",
 });
 
 interface ExperienceTabProps {
@@ -928,6 +920,8 @@ interface ExperienceTabProps {
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
+  // FIX: this prop was used in the component body but never declared here.
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
 }
 
 function ExperienceTab({
@@ -938,12 +932,9 @@ function ExperienceTab({
   onRemove,
   errors,
 }: ExperienceTabProps) {
-  // Job location fields — this tab's own countries/cities lookups,
-  // deliberately separate from the Personal tab's birth country/city.
-  const { data: experience } = useQuery({
-    queryKey: ["experiences"],
-    queryFn: GetExperiences,
-  });
+  console.log("entries", entries);
+  const { data: profile } = useUserProfile();
+  const experience = profile?.experiences;
   function toMonthInput(date: string | Date | null | undefined): string {
     if (!date) return "";
     const d = new Date(date);
@@ -954,20 +945,21 @@ function ExperienceTab({
   }
 
   React.useEffect(() => {
-    if (experience && experience.length > 0) {
+    if (experience && experience?.length > 0) {
       setFormData((prev) => ({
         ...prev,
         experience: experience.map((exp: any, index: number) => ({
           id: exp.id ?? index + 1,
-          job_title: exp.job_title ?? "",
+          job_title: exp.jobTitle ?? "",
           company: exp.company ?? "",
           country: exp.country ?? "",
           city: exp.city ?? "",
-          start_date: toMonthInput(exp.start_date ?? ""),
-          end_date: toMonthInput(exp.end_date ?? ""),
+          start_date: toMonthInput(exp.startDate ?? ""),
+          end_date: toMonthInput(exp.endDate ?? ""),
           salary: exp.salary ?? "",
           responsibilities: exp.responsibility ?? "",
-          reason: exp.reason ?? "",
+          reason: exp.reasonForLeave ?? "",
+          city_other: exp.cityOther ?? "",
         })),
       }));
     }
@@ -983,7 +975,7 @@ function ExperienceTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            removeDisabled={entries?.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1014,55 +1006,6 @@ function ExperienceTab({
                 />
               </Field>
 
-              {/* <Field label="Country" error={errors[`${entry.id}_country`]}>
-                <select
-                  value={entry.country || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "country", e.target.value)
-                  }
-                  disabled={isLoadingCountries}
-                  className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
-                >
-                  <option value="">
-                    {isLoadingCountries
-                      ? "Loading countries..."
-                      : "Select country"}
-                  </option>
-                  {countriesError && (
-                    <option disabled>Failed to load countries</option>
-                  )}
-                  {countries?.map(
-                    (country: { id: number; country: string }) => (
-                      <option key={country.id} value={country.country}>
-                        {country.country}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </Field>
-
-              <Field label="City" error={errors[`${entry.id}_city`]}>
-                <select
-                  value={entry.city || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "city", e.target.value)
-                  }
-                  disabled={isLoadingCities}
-                  className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
-                >
-                  <option value="">
-                    {isLoadingCities ? "Loading cities..." : "Select city"}
-                  </option>
-                  {citiesError && (
-                    <option disabled>Failed to load cities</option>
-                  )}
-                  {cities?.map((city: { id: number; city: string }) => (
-                    <option key={city.id} value={city.city}>
-                      {city.city}
-                    </option>
-                  ))}
-                </select>
-              </Field> */}
               <LocationSelects
                 required
                 countryName={`experience[${entry.id}].country`}
@@ -1078,6 +1021,18 @@ function ExperienceTab({
                 countryError={errors[`${entry.id}_country`]}
                 cityError={errors[`${entry.id}_city`]}
               />
+              {entry.city === "other" && (
+                <Field label="City (Other)" required error={errors.city_other}>
+                  <FlameInput
+                    name="city_other"
+                    value={entry.city_other || ""}
+                    onChange={(e) =>
+                      onFieldChange(entry.id, "city_other", e.target.value)
+                    }
+                    placeholder="Enter your city"
+                  />
+                </Field>
+              )}
 
               <Field
                 label="Start date"
@@ -1176,10 +1131,6 @@ export interface EducationEntry {
   total_marks_gpa: string;
 }
 
-// ---------------------------------------------------------------------------
-// Education Types & Validation
-// ---------------------------------------------------------------------------
-
 export const emptyEducation = (id: number): EducationEntry => ({
   id,
   qualification_group_id: "",
@@ -1199,10 +1150,6 @@ export const emptyEducation = (id: number): EducationEntry => ({
   division_grade: "",
   total_marks_gpa: "",
 });
-
-// ---------------------------------------------------------------------------
-// Education Single Row Component (Handles Dynamic Qualification Lookup)
-// ---------------------------------------------------------------------------
 
 interface EducationRowProps {
   entry: EducationEntry;
@@ -1231,8 +1178,6 @@ function EducationRow({
   isLoadingGroups,
   isLoadingInstitutes,
 }: EducationRowProps) {
-  console.log("errorsss", errors);
-  // Dynamic fetch for specific qualifications based on chosen group
   const { data: qualifications = [], isLoading: isLoadingQualifications } =
     useQuery({
       queryKey: ["qualifications", entry.qualification_group_id],
@@ -1242,7 +1187,7 @@ function EducationRow({
     });
 
   const groupOptions = qualificationGroups.map((g: any) => ({
-    label: g.name || g.title,
+    label: g.groupName || g.title,
     value: g.id,
   }));
 
@@ -1346,11 +1291,14 @@ function EducationRow({
           onCountryChange={(e) =>
             onFieldChange(entry.id, "country", e.target.value)
           }
-          onCityChange={(e) =>
-            onFieldChange(entry.id, "country", e.target.value)
-          }
-          countryError={errors.country}
-          cityError={errors.city}
+          // FIX: this previously called onFieldChange(entry.id, "country", ...)
+          // so selecting a city silently overwrote the country field instead.
+          onCityChange={(e) => onFieldChange(entry.id, "city", e.target.value)}
+          // FIX: these read the flat `errors.country` / `errors.city` keys,
+          // but validate() stores per-row errors as `${entry.id}_country` /
+          // `${entry.id}_city`, so the messages never rendered.
+          countryError={errors[`${entry.id}_country`]}
+          cityError={errors[`${entry.id}_city`]}
         />
 
         <Field
@@ -1427,10 +1375,6 @@ function EducationRow({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main Education Tab Container Component
-// ---------------------------------------------------------------------------
-
 interface EducationTabProps {
   entries: EducationEntry[];
   onFieldChange: (
@@ -1452,8 +1396,6 @@ export function EducationTab({
   setFormData,
   errors,
 }: EducationTabProps) {
-  console.log("bbbbbbb", errors);
-  // Fetch Shared Dropdown Data
   const { data: qualificationGroups = [], isLoading: isLoadingGroups } =
     useQuery({
       queryKey: ["qualificationGroups"],
@@ -1467,32 +1409,29 @@ export function EducationTab({
     staleTime: 1000 * 60 * 60,
   });
 
-  // Fetch Existing User Education Profile Data
-  const { data: profileEducation } = useQuery({
-    queryKey: ["user_education"],
-    queryFn: async () => {
-      const res = await axios.get("/api/user_education", {
-        withCredentials: true,
-      });
-      return res.data.education;
-    },
-  });
+  const { data: profile } = useUserProfile();
+  const profileEducation = profile?.education;
 
   React.useEffect(() => {
-    if (profileEducation && profileEducation.length > 0) {
+    if (profileEducation && profileEducation?.length > 0) {
       setFormData((prev: any) => ({
         ...prev,
         education: profileEducation.map((edu: any, index: number) => ({
           id: edu.id ?? index + 1,
-          qualification_group_id: String(edu.qualification_group_id ?? ""),
-          qualification_id: String(edu.qualification_id ?? ""),
-          institute_id: String(edu.institute_id ?? ""),
-          institute_other: edu.institute_other ?? "",
-          major_subject: edu.major_subject ?? "",
-          passing_year: String(edu.passing_year ?? ""),
-          obtained_marks_gpa: String(edu.obtained_marks_gpa ?? ""),
-          total_marks_gpa: String(edu.total_marks_gpa ?? ""),
-          division_grade: edu.division_grade ?? "",
+          qualification_group_id: String(edu.qualificationGroupId ?? ""),
+          qualification_id: String(edu.qualificationId ?? ""),
+          institute_id: String(edu.institutionId ?? ""),
+          institute_other: edu.instituteOther ?? "",
+          major_subject: edu.majorSubject ?? "",
+          // FIX: country/city were previously dropped when reloading a
+          // saved profile, silently clearing fields that had been filled in.
+          country: edu.countryId ?? "",
+          city: edu.cityId ?? "",
+          city_other: edu.cityOther ?? "",
+          passing_year: String(edu.passingYear ?? ""),
+          obtained_marks_gpa: String(edu.obtainedMarks ?? ""),
+          total_marks_gpa: String(edu.totalMarks ?? ""),
+          division_grade: edu.divisionGrade ?? "",
         })),
       }));
     }
@@ -1511,7 +1450,7 @@ export function EducationTab({
             entry={entry}
             onFieldChange={onFieldChange}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            removeDisabled={entries?.length === 1}
             errors={errors}
             qualificationGroups={qualificationGroups}
             institutes={institutes}
@@ -1535,7 +1474,7 @@ interface CertificateEntry {
   id: number;
   name: string;
   organisation: string;
-  document_name: string;
+  document?: File | null;
   issue_date: string;
 }
 
@@ -1543,7 +1482,7 @@ const emptyCertificate = (id: number): CertificateEntry => ({
   id,
   name: "",
   organisation: "",
-  document_name: "",
+  document: null,
   issue_date: "",
 });
 
@@ -1559,13 +1498,45 @@ interface CertificatesTabProps {
   errors: Record<string, string>;
 }
 
-function CertificatesTab({
+export function CertificatesTab({
   entries,
   onFieldChange,
   onAdd,
   onRemove,
+  setFormData,
   errors,
 }: CertificatesTabProps) {
+  const { data: profile } = useUserProfile();
+  const profileCertificates = profile?.certificates;
+
+  React.useEffect(() => {
+    if (profileCertificates && profileCertificates?.length > 0) {
+      setFormData((prev: any) => ({
+        ...prev,
+        certificates: profileCertificates.map((cert: any, index: number) => ({
+          id: cert.id ?? index + 1,
+          name: cert.certificateName || "",
+          organisation: cert.organisation || "",
+          // Formats "2026-09-01T00:00:00.000Z" to "2026-09-01" for <input type="date" />
+          issue_date: cert.issueDate ? cert.issueDate.split("T")[0] : "",
+          document: cert.document || null,
+        })),
+      }));
+    }
+  }, [profileCertificates, setFormData]);
+
+  // Helper function to extract and display file name from string path or File object
+  const getDocumentName = (doc: any) => {
+    if (!doc) return "Choose file...";
+    if (typeof doc === "string") {
+      return doc.split("/").pop();
+    }
+    if (doc instanceof File) {
+      return doc.name;
+    }
+    return "File attached";
+  };
+
   return (
     <div>
       <SectionHeading
@@ -1577,10 +1548,9 @@ function CertificatesTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            removeDisabled={entries?.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
-              {/* Certification Name */}
               <Field
                 label="Certification Name"
                 required
@@ -1595,7 +1565,6 @@ function CertificatesTab({
                 />
               </Field>
 
-              {/* Issuing Organisation */}
               <Field
                 label="Issuing Organisation"
                 required
@@ -1610,7 +1579,6 @@ function CertificatesTab({
                 />
               </Field>
 
-              {/* Issue Date */}
               <Field
                 label="Issue Date"
                 required
@@ -1624,35 +1592,7 @@ function CertificatesTab({
                   }
                 />
               </Field>
-              {/* <Field
-                label="End Date"
-                required
-                error={errors[`${entry.id}_end_date`]}
-              >
-                <FlameInput
-                  type="date"
-                  value={entry.end_date || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "end_date", e.target.value)
-                  }
-                />
-              </Field> */}
 
-              {/* Credential ID */}
-              {/* <Field
-                label="Credential ID"
-                error={errors[`${entry.id}_credential_id`]}
-              >
-                <FlameInput
-                  value={entry.credential_id || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "credential_id", e.target.value)
-                  }
-                  placeholder="e.g. ABC-12345678"
-                />
-              </Field> */}
-
-              {/* Attach Document Option */}
               <Field
                 label="Attach Document"
                 error={errors[`${entry.id}_document`]}
@@ -1660,7 +1600,7 @@ function CertificatesTab({
                 <div className="flex items-center gap-2">
                   <label className="flex-1 cursor-pointer rounded-md border border-gray-300 bg-white p-2 text-sm text-gray-700 shadow-sm transition hover:bg-gray-50 flex items-center justify-between">
                     <span className="truncate">
-                      {entry.document ? entry.document.name : "Choose file..."}
+                      {getDocumentName(entry.document)}
                     </span>
                     <span className="ml-2 rounded bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
                       Browse
@@ -1671,24 +1611,17 @@ function CertificatesTab({
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null;
-                        onFieldChange(entry.id, "document_name", file);
-                        onFieldChange(
-                          entry.id,
-                          "document_name",
-                          file ? file.name : "",
-                        );
+                        if (file) {
+                          onFieldChange(entry.id, "document", file);
+                        }
                       }}
                     />
                   </label>
 
-                  {/* Remove Attached Document Button */}
-                  {(entry.document || entry.document_name) && (
+                  {entry.document && (
                     <button
                       type="button"
-                      onClick={() => {
-                        onFieldChange(entry.id, "document", null);
-                        onFieldChange(entry.id, "document_name", "");
-                      }}
+                      onClick={() => onFieldChange(entry.id, "document", null)}
                       className="rounded p-2 text-red-500 hover:bg-red-50 hover:text-red-700"
                       title="Remove attachment"
                     >
@@ -1744,7 +1677,24 @@ function MembershipsTab({
   onAdd,
   onRemove,
   errors,
+  setFormData,
 }: MembershipsTabProps) {
+  const { data: profile } = useUserProfile();
+  const memberships = profile?.memberships;
+  React.useEffect(() => {
+    if (memberships && memberships?.length > 0) {
+      setFormData((prev: any) => ({
+        ...prev,
+        memberships: memberships.map((edu: any, index: number) => ({
+          id: edu.id ?? index + 1,
+          membership_type: edu.membershipType ?? "",
+          organisation: edu.organisation ?? "",
+          member_since: edu.memberSince ?? "",
+        })),
+      }));
+    }
+  }, [memberships, setFormData]);
+  console.log(entries);
   return (
     <div>
       <SectionHeading
@@ -1756,7 +1706,7 @@ function MembershipsTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries.length === 1}
+            removeDisabled={entries?.length === 1}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1796,18 +1746,6 @@ function MembershipsTab({
                   }
                 />
               </Field>
-              {/* <Field
-                label="Membership ID"
-                error={errors[`${entry.id}_membership_id`]}
-              >
-                <FlameInput
-                  value={entry.membership_id}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "membership_id", e.target.value)
-                  }
-                  placeholder="Optional"
-                />
-              </Field> */}
             </div>
           </RepeatableCard>
         ))}
@@ -1840,8 +1778,6 @@ const initialFormData: ProfileFormData = {
   birth_country: "",
   birth_city: "",
   birth_city_other: "",
-  // is_pakistani: "",
-  // cnic: "",
   passport_no: "",
   domicile: "",
   mobile_prefix: "",
@@ -1860,17 +1796,83 @@ const initialFormData: ProfileFormData = {
   certificates: [emptyCertificate(1)],
   memberships: [emptyMembership(1)],
 };
+import { useMemo } from "react";
 
+export function calculateProfileProgress(job, profile) {
+  // Return 0 if either object is missing
+  if (!job?.profileCompletion || !profile) return 0;
+
+  const rules = job.profileCompletion;
+  const totalRequired = Number(rules.count) || 0;
+
+  if (totalRequired === 0) return 0;
+
+  let completedCount = 0;
+
+  // 1. Image Check
+  if (rules.image && Boolean(profile.userPic)) {
+    completedCount++;
+  }
+
+  // 2. Personal Detail Check (Checking core required field like fatherName/CNIC/mobile)
+  if (rules.personal && Boolean(profile.fatherName || profile.cnic)) {
+    completedCount++;
+  }
+
+  // 3. Experience Check (Array must exist and have at least 1 record)
+  if (
+    rules.experience &&
+    Array.isArray(profile.experiences) &&
+    profile.experiences?.length > 0
+  ) {
+    completedCount++;
+  }
+
+  // 4. Education Check (Array must exist and have at least 1 record)
+  if (
+    rules.education &&
+    Array.isArray(profile.education) &&
+    profile.education?.length > 0
+  ) {
+    completedCount++;
+  }
+
+  // 5. Certificate Check (Array must exist and have at least 1 record)
+  if (
+    rules.certificate &&
+    Array.isArray(profile.certificates) &&
+    profile.certificates?.length > 0
+  ) {
+    completedCount++;
+  }
+
+  // 6. Membership Check (Array must exist and have at least 1 record)
+  if (
+    rules.membership &&
+    Array.isArray(profile.memberships) &&
+    profile.memberships?.length > 0
+  ) {
+    completedCount++;
+  }
+
+  // Calculate percentage
+  return Math.round((completedCount / totalRequired) * 100);
+}
 export default function ProfileTabs() {
   const [activeTab, setActiveTab] = useState<TabId>("photo");
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState<ProfileFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const QueryClient = useQueryClient();
 
-  // -------------------------------------------------------------------------
-  // Validation — every field on the currently active tab is checked.
-  // -------------------------------------------------------------------------
+  const { data: profile } = useUserProfile();
+  const { jobId, job, exists, isLoading } = useFindingId();
+  const progressPercentage = useMemo(
+    () => calculateProfileProgress(job, profile),
+    [job, profile],
+  );
+console.log(progressPercentage)
   function validate() {
     const newErrors: Record<string, string> = {};
 
@@ -1884,7 +1886,7 @@ export default function ProfileTabs() {
       const fatherName = formData.father_name?.trim() || "";
       if (!fatherName) {
         newErrors.father_name = "Father's / Husband's name is required";
-      } else if (fatherName.length < 3) {
+      } else if (fatherName?.length < 3) {
         newErrors.father_name = "Name must be at least 3 characters";
       } else if (!NAME_REGEX.test(fatherName)) {
         newErrors.father_name = "Name can only contain letters";
@@ -1926,27 +1928,10 @@ export default function ProfileTabs() {
         newErrors.birth_city_other = "Please specify your birth city";
       }
 
-      // if (!formData.is_pakistani) {
-      //   newErrors.is_pakistani = "Please select an option";
-      // }
-
-      // CNIC and passport are mutually exclusive, based on citizenship.
-      // if (formData.is_pakistani === "Yes") {
-      //   if (!formData.cnic?.trim()) {
-      //     newErrors.cnic = "CNIC is required";
-      //   } else if (!CNIC_REGEX.test(formData.cnic.trim())) {
-      //     newErrors.cnic = "CNIC must be exactly 13 digits";
-      //   }
-      // } else if (formData.is_pakistani === "No") {
-      //   if (!formData.passport_no?.trim()) {
-      //     newErrors.passport_no = "Passport number is required";
-      //   }
-      // }
-
       const domicile = formData.domicile?.trim() || "";
       if (!domicile) {
         newErrors.domicile = "Domicile is required";
-      } else if (domicile.length < 2) {
+      } else if (domicile?.length < 2) {
         newErrors.domicile = "Domicile looks too short";
       }
 
@@ -1961,8 +1946,6 @@ export default function ProfileTabs() {
         newErrors.mobile_number = "Enter a valid 7-digit mobile number";
       }
 
-      // Home phone is optional. Only validate format once the person has
-      // started filling either half of it in.
       const homePrefixTrimmed = formData.home_prefix?.trim() || "";
       const homeNumberTrimmed = formData.home_number?.trim() || "";
       if (homePrefixTrimmed || homeNumberTrimmed) {
@@ -1993,14 +1976,14 @@ export default function ProfileTabs() {
       const currentAddress = formData.current_address?.trim() || "";
       if (!currentAddress) {
         newErrors.current_address = "Current address is required";
-      } else if (currentAddress.length < 10) {
+      } else if (currentAddress?.length < 10) {
         newErrors.current_address = "Please provide a more complete address";
       }
 
       const permanentAddress = formData.permanent_address?.trim() || "";
       if (!permanentAddress) {
         newErrors.permanent_address = "Permanent address is required";
-      } else if (permanentAddress.length < 10) {
+      } else if (permanentAddress?.length < 10) {
         newErrors.permanent_address = "Please provide a more complete address";
       }
 
@@ -2057,6 +2040,10 @@ export default function ProfileTabs() {
         if (!entry.reason) {
           newErrors[`${entry.id}_reason`] = "Reason is required";
         }
+        if (entry.city === "other" && !entry.city_other?.trim()) {
+          newErrors[`${entry.id}_city_other`] =
+            "Please specify your experience city";
+        }
       });
     }
 
@@ -2068,26 +2055,23 @@ export default function ProfileTabs() {
         return String(val).trim();
       };
 
-      if (!formData.education || formData.education.length === 0) {
+      if (!formData.education || formData.education?.length === 0) {
         newErrors["education_general"] =
           "At least one education entry is required";
       } else {
         formData.education.forEach((entry, index) => {
           const keyPrefix = `${entry.id ?? index}_`;
-          console.log(entry.id);
-          // Qualification Level
+
           if (!getSafeString(entry.qualification_group_id)) {
             newErrors[`${keyPrefix}qualification_group_id`] =
               "Qualification level is required";
           }
 
-          // Degree / Qualification
           if (!getSafeString(entry.qualification_id)) {
             newErrors[`${keyPrefix}qualification_id`] =
               "Degree/Qualification is required";
           }
 
-          // Institute
           const instituteIdStr = getSafeString(entry.institute_id);
 
           if (!instituteIdStr) {
@@ -2101,23 +2085,19 @@ export default function ProfileTabs() {
               "Please specify institute name";
           }
 
-          // Major Subject
           if (!getSafeString(entry.major_subject)) {
             newErrors[`${keyPrefix}major_subject`] =
               "Major subject / Specialization is required";
           }
 
-          // Country
           if (!getSafeString(entry.country)) {
             newErrors[`${keyPrefix}country`] = "Country is required";
           }
 
-          // City
           if (!getSafeString(entry.city)) {
             newErrors[`${keyPrefix}city`] = "City is required";
           }
 
-          // Passing Year
           const passingYearStr = getSafeString(entry.passing_year);
 
           if (!passingYearStr) {
@@ -2134,7 +2114,6 @@ export default function ProfileTabs() {
             }
           }
 
-          // Obtained marks / GPA
           const obtainedStr = getSafeString(entry.obtained_marks_gpa);
           const obtainedNum = parseFloat(obtainedStr);
 
@@ -2146,7 +2125,6 @@ export default function ProfileTabs() {
               "Enter a valid positive number";
           }
 
-          // Total marks / GPA
           const totalStr = getSafeString(entry.total_marks_gpa);
           const totalNum = parseFloat(totalStr);
 
@@ -2158,7 +2136,6 @@ export default function ProfileTabs() {
               "Total marks/CGPA must be greater than 0";
           }
 
-          // Obtained cannot exceed total
           if (
             obtainedStr &&
             totalStr &&
@@ -2172,7 +2149,6 @@ export default function ProfileTabs() {
               "Obtained cannot exceed total";
           }
 
-          // Division / Grade
           if (!getSafeString(entry.division_grade)) {
             newErrors[`${keyPrefix}division_grade`] =
               "Division / Grade is required";
@@ -2193,8 +2169,8 @@ export default function ProfileTabs() {
         if (!entry.issue_date) {
           newErrors[`${entry.id}_issue_date`] = "Issue date is required";
         }
-        if (!entry.document_name) {
-          newErrors[`${entry.id}_issue_date`] = "Document is required";
+        if (!entry.document) {
+          newErrors[`${entry.id}_document`] = "Document is required";
         }
       });
     }
@@ -2209,21 +2185,16 @@ export default function ProfileTabs() {
             "Membership Type is required";
         }
         if (!entry.member_since.trim()) {
-          newErrors[`${entry.id}_member_since`] = "Member Since  is required";
+          newErrors[`${entry.id}_member_since`] = "Member Since is required";
         }
       });
     }
 
     setErrors(newErrors);
-    console.log("jijoijoi", newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors)?.length === 0;
   }
 
-  // Fields where only digits should ever be typeable — this stops a person
-  // from pasting/typing letters into a phone number in the first place,
-  // rather than only flagging it after they hit Save.
   const DIGITS_ONLY_FIELDS = new Set([
-    // "cnic",
     "mobile_prefix",
     "mobile_number",
     "home_prefix",
@@ -2233,7 +2204,6 @@ export default function ProfileTabs() {
     "ssgc_employee_number",
   ]);
 
-  // Fields restricted to human-name characters as the person types.
   const NAME_ONLY_FIELDS = new Set(["father_name", "ssgc_employee_name"]);
 
   function sanitizeValue(name: string, value: string): string {
@@ -2256,12 +2226,6 @@ export default function ProfileTabs() {
       if (name === "birth_city" && value !== "other") {
         updated.birth_city_other = "";
       }
-      // if (name === "is_pakistani" && value === "Yes") {
-      //   updated.passport_no = "";
-      // }
-      // if (name === "is_pakistani" && value === "No") {
-      //   updated.cnic = "";
-      // }
       if (name === "already_worked_ssgc" && value !== "Yes") {
         updated.ssgc_employee_name = "";
         updated.ssgc_employee_number = "";
@@ -2270,10 +2234,7 @@ export default function ProfileTabs() {
     });
     setErrors((prev) => {
       if (!prev[name]) {
-        // Even if this exact field has no error, switching is_pakistani or
-        // already_worked_ssgc can invalidate errors on dependent fields
-        // (cnic/passport_no, ssgc_employee_name/number) — clear those too.
-        if (name === "is_pakistani" || name === "already_worked_ssgc") {
+        if (name === "already_worked_ssgc") {
           const dependentKeys = ["ssgc_employee_name", "ssgc_employee_number"];
           const hasDependentError = dependentKeys.some((k) => prev[k]);
           if (!hasDependentError) return prev;
@@ -2296,7 +2257,15 @@ export default function ProfileTabs() {
     }
   }
 
-  // Generic helpers for the four repeatable-entry tabs -----------------------
+  const DELETE_ENDPOINTS: Record<
+    "experience" | "education" | "certificates" | "memberships",
+    string
+  > = {
+    experience: "/api/experiences",
+    education: "/api/education",
+    certificates: "/api/certificates",
+    memberships: "/api/memberships",
+  };
 
   function makeEntryHandlers<
     K extends "experience" | "education" | "certificates" | "memberships",
@@ -2335,25 +2304,20 @@ export default function ProfileTabs() {
 
         setFormData((prev) => {
           const list = prev[key] as any[];
-          if (list.length === 1) return prev;
+          if (list?.length === 1) return prev;
           return { ...prev, [key]: list.filter((entry) => entry.id !== id) };
         });
 
-        // Only call the API if this was a persisted (existing) record.
-        // Freshly added local-only entries use Date.now() as their id and
-        // were never saved, so there's nothing to delete on the server.
-        const isPersistedId = id < 10_000_000_000; // adjust threshold as needed, or track this explicitly
+        const isPersistedId = id < 10_000_000_000;
         if (!isPersistedId) return;
 
         try {
-          await axios.delete(`/api/experiences/${id}`, {
+          await axios.delete(`${DELETE_ENDPOINTS[key]}/${id}`, {
             withCredentials: true,
           });
         } catch (err) {
           console.error(`Failed to delete ${key} entry`, err);
           alert("Something went wrong while deleting. Please try again.");
-          // Optionally: re-fetch or re-add the entry back to formData here,
-          // since the local state and DB are now out of sync.
         }
       },
     };
@@ -2386,7 +2350,7 @@ export default function ProfileTabs() {
           }
           const photoPayload = new FormData();
           photoPayload.append("pic", formData.image);
-          await axios.post("/api/profile", photoPayload, {
+          await axios.post("/api/user_profile", photoPayload, {
             withCredentials: true,
           });
           break;
@@ -2411,42 +2375,52 @@ export default function ProfileTabs() {
           await axios.patch(
             "/api/profile",
             { experience: formData.experience },
-            {
-              withCredentials: true,
-            },
+            { withCredentials: true },
           );
           break;
         }
-
         case "education": {
           await axios.patch(
             "/api/profile",
             { education: formData.education },
-            {
-              withCredentials: true,
-            },
+            { withCredentials: true },
           );
           break;
         }
 
         case "certificates": {
-          await axios.patch(
-            "/api/profile",
-            { certificates: formData.certificates },
-            {
-              withCredentials: true,
-            },
-          );
+          const payload = new FormData();
+
+          const certificatesMeta = formData.certificates.map((cert) => ({
+            id: cert.id,
+            name: cert.name,
+            organisation: cert.organisation,
+            issue_date: cert.issue_date,
+            document: cert.document instanceof File ? null : cert.document,
+          }));
+
+          payload.append("certificates", JSON.stringify(certificatesMeta));
+          formData.certificates.forEach((cert, index) => {
+            if (cert.document instanceof File) {
+              payload.append(`document_${index}`, cert.document);
+            }
+          });
+
+          const res = await axios.patch("/api/profile", payload, {
+            withCredentials: true,
+          });
+
+          // setFormData((prev) => ({
+          //   ...prev,
+          //   certificates: res.data.certificates,
+          // }));
           break;
         }
-
         case "memberships": {
           await axios.patch(
             "/api/profile",
             { memberships: formData.memberships },
-            {
-              withCredentials: true,
-            },
+            { withCredentials: true },
           );
           break;
         }
@@ -2454,7 +2428,7 @@ export default function ProfileTabs() {
         default:
           break;
       }
-
+      await QueryClient.invalidateQueries({ queryKey: ["profile_data"] });
       alert("Saved successfully!");
     } catch (err) {
       console.error("Submission failed", err);
@@ -2464,11 +2438,52 @@ export default function ProfileTabs() {
     }
   }
 
+  if (jobId && isLoading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: flame.paper }}
+      >
+        <p className="text-slate-600 font-medium">Verifying Job ID...</p>
+      </div>
+    );
+  }
+
+  if (jobId && !exists) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{ background: flame.paper }}
+      >
+        <div className="bg-white p-8 rounded-xl border border-slate-200 text-center max-w-md shadow-sm">
+          <h2 className="text-xl font-bold text-slate-800 mb-2">
+            Invalid Job ID
+          </h2>
+          <p className="text-slate-500 text-sm mb-6">
+            The Job ID specified in the URL is invalid or has expired. Please
+            check the link and try again.
+          </p>
+          <a
+            href="/profile"
+            className="inline-block px-5 py-2.5 rounded-md text-white text-sm font-medium transition-opacity hover:opacity-90"
+            style={{ background: flameGradient }}
+          >
+            Go to General Profile
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className="min-h-screen py-10 px-4"
       style={{ background: flame.paper }}
     >
+      {jobId && exists && progressPercentage != 0 && (
+        <ProgressBar progress={progressPercentage} />
+      )}
+
       <div className="max-w-7xl mx-auto">
         <div className="mb-6 flex items-center gap-3">
           <div
@@ -2525,7 +2540,7 @@ export default function ProfileTabs() {
                       fontWeight: isActive ? 700 : 600,
                       background: isActive ? "#F8FAFC" : "transparent",
                       borderRight:
-                        index !== TABS.length - 1
+                        index !== TABS?.length - 1
                           ? "1px solid #E2E8F0"
                           : "none",
                     }}
@@ -2564,6 +2579,7 @@ export default function ProfileTabs() {
               <ExperienceTab
                 entries={formData.experience}
                 errors={errors}
+                setFormData={setFormData}
                 {...experienceHandlers}
               />
             )}
@@ -2571,6 +2587,7 @@ export default function ProfileTabs() {
               <EducationTab
                 entries={formData.education}
                 errors={errors}
+                setFormData={setFormData}
                 {...educationHandlers}
               />
             )}
@@ -2578,6 +2595,7 @@ export default function ProfileTabs() {
               <CertificatesTab
                 entries={formData.certificates}
                 errors={errors}
+                setFormData={setFormData}
                 {...certificatesHandlers}
               />
             )}
@@ -2585,6 +2603,7 @@ export default function ProfileTabs() {
               <MembershipsTab
                 entries={formData.memberships}
                 errors={errors}
+                setFormData={setFormData}
                 {...membershipsHandlers}
               />
             )}

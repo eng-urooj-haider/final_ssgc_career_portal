@@ -483,7 +483,7 @@ function useFindingId() {
   });
 
   const exists = job != null;
-
+  console.log(job);
   return { jobId, job, exists, isLoading };
 }
 function PersonalTab({
@@ -1872,7 +1872,7 @@ export default function ProfileTabs() {
     () => calculateProfileProgress(job, profile),
     [job, profile],
   );
-
+  console.log(progressPercentage);
   function validate() {
     const newErrors: Record<string, string> = {};
 
@@ -2474,38 +2474,104 @@ export default function ProfileTabs() {
       </div>
     );
   }
+  function formatDeadline(deadline: unknown): string {
+    if (!deadline) return "-";
+    const d = new Date(deadline as string | number | Date);
+    if (Number.isNaN(d.getTime())) return "-";
+
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = d.toLocaleString("en-US", { month: "short" }); // "Nov"
+    const year = d.getFullYear();
+
+    return `${day}-${month}-${year}`;
+  }
 
   return (
     <div
       className="min-h-screen py-10 px-4"
       style={{ background: flame.paper }}
     >
+      <div className="mb-6 flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: flameGradient }}
+        >
+          <Flame
+            className="w-5 h-5 text-white"
+            fill="white"
+            fillOpacity={0.25}
+          />
+        </div>
+        <div>
+          <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
+            Candidate profile
+          </h1>
+          <p className="text-sm text-slate-500">
+            Keep your profile up to date to be considered for new openings.
+          </p>
+        </div>
+      </div>
       {jobId && exists && progressPercentage != 0 && (
         <ProgressBar progress={progressPercentage} />
       )}
 
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex items-center gap-3">
+      {jobId && exists && progressPercentage === 100 && (
+        <div className="max-w-7xl mx-auto mb-6">
           <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: flameGradient }}
+            className="bg-white rounded-xl p-6"
+            style={{ border: "1px solid #E7E5E1" }}
           >
-            <Flame
-              className="w-5 h-5 text-white"
-              fill="white"
-              fillOpacity={0.25}
-            />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
-              Candidate profile
-            </h1>
-            <p className="text-sm text-slate-500">
-              Keep your profile up to date to be considered for new openings.
+            <p
+              className="text-sm font-semibold mb-4"
+              style={{ color: flame.ink }}
+            >
+              You have applied for the following job position:
             </p>
+            <table className="w-full text-sm text-left border border-slate-200 rounded-md overflow-hidden">
+              <thead style={{ background: "#F8FAFC" }}>
+                <tr>
+                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
+                    Job Code
+                  </th>
+                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
+                    Job Title
+                  </th>
+                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
+                    DEADLINE
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
+                    {job?.jobCode ?? job?.code ?? "-"}
+                  </td>
+                  <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
+                    {job?.jobTitle ?? job?.title ?? "-"}
+                  </td>
+                  <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
+                    {formatDeadline(job?.deadline)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
+          <p className="text-slate-700">
+            Note: Please review your resume details below before confirming your
+            job application.
+          </p>
+          <button
+            type="button"
+            className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            style={{ background: flameGradient }}
+            onClick={handleSubmit}
+          >
+            Confirm Your Job Application
+          </button>
         </div>
+      )}
 
+      <div className="max-w-7xl mx-auto">
         <div
           className="bg-white rounded-xl overflow-hidden"
           style={{
