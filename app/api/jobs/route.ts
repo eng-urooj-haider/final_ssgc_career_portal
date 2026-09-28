@@ -39,7 +39,7 @@ function validateFile(file: FormDataEntryValue | null): string | null {
 
 async function saveFile(file: FormDataEntryValue | null, jobCode: string) {
   if (!(file instanceof File) || file.size === 0) return null;
-  const folder = `job-${safeSegment(jobCode)}`;
+  const folder = `job-${safeSegment(jobCode)}/attachments`;
   const dir = path.join(process.cwd(), "public", "uploads", folder);
   await mkdir(dir, { recursive: true });
   const filename = `${Date.now()}-${safeFilename(file.name)}`;

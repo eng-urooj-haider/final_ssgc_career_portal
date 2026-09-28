@@ -13,7 +13,11 @@ export default function EditJobPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const { data: apiData, isLoading, isError } = useQuery({
+  const {
+    data: apiData,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["job", id],
     queryFn: () => getJob(id),
     staleTime: 0, // always load fresh values when opening the edit form
@@ -57,6 +61,7 @@ export default function EditJobPage() {
       subtitle="Update the details below and save your changes."
     >
       <JobForm
+        isEdit
         key={job.id} // remount if a different job is loaded
         initialData={{
           job_code: job.jobCode ?? "",

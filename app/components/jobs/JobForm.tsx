@@ -109,14 +109,22 @@ export interface JobFormData {
 
   attachment_1_title: string;
   attachment_1_doc: File | null;
+  attachment_1_remove: boolean; // true = delete the saved file on the server
   attachment_2_title: string;
   attachment_2_doc: File | null;
+  attachment_2_remove: boolean;
 
   request_doc_1_title: string;
   request_doc_2_title: string;
 
   job_type: "Permanent" | "Staff" | "Trainee" | "Email" | "";
   email: string;
+}
+
+/** Server paths of already-saved attachments (edit mode). */
+export interface ExistingDocs {
+  attachment_1_doc?: string | null;
+  attachment_2_doc?: string | null;
 }
 
 export const emptyJobFormData: JobFormData = {
@@ -134,8 +142,10 @@ export const emptyJobFormData: JobFormData = {
 
   attachment_1_title: "",
   attachment_1_doc: null,
+  attachment_1_remove: false,
   attachment_2_title: "",
   attachment_2_doc: null,
+  attachment_2_remove: false,
 
   request_doc_1_title: "",
   request_doc_2_title: "",
@@ -162,7 +172,10 @@ const stripHtml = (html: string) =>
     .replace(/&nbsp;/g, " ")
     .trim();
 
-export function validateJobForm(d: JobFormData): JobFormErrors {
+export function validateJobForm(
+  d: JobFormData,
+  existingDocs: ExistingDocs = {},
+): JobFormErrors {
   const e: JobFormErrors = {};
 
   // Job code
@@ -202,15 +215,26 @@ export function validateJobForm(d: JobFormData): JobFormErrors {
   if (!stripHtml(d.qualification))
     e.qualification = "Qualification & experience is required.";
 
-  // Attachments
+  // Attachments — a saved file (not marked for removal) counts as attached
   [
-    { n: 1, title: d.attachment_1_title.trim(), file: d.attachment_1_doc },
-    { n: 2, title: d.attachment_2_title.trim(), file: d.attachment_2_doc },
-  ].forEach(({ n, title: t, file }) => {
-    if (file && !t)
+    {
+      n: 1,
+      title: d.attachment_1_title.trim(),
+      file: d.attachment_1_doc,
+      kept: !!existingDocs.attachment_1_doc && !d.attachment_1_remove,
+    },
+    {
+      n: 2,
+      title: d.attachment_2_title.trim(),
+      file: d.attachment_2_doc,
+      kept: !!existingDocs.attachment_2_doc && !d.attachment_2_remove,
+    },
+  ].forEach(({ n, title: t, file, kept }) => {
+    const hasDoc = !!file || kept;
+
+    if (hasDoc && !t)
       e[`attachment_${n}_title`] = "Enter a title for this document.";
-    // Remove this rule in edit mode if the file already exists on the server
-    if (t && !file)
+    if (t && !hasDoc)
       e[`attachment_${n}_doc`] = "Attach a file or clear the title.";
     if (file) {
       if (!ALLOWED_FILE_TYPES.includes(file.type))
@@ -239,6 +263,8 @@ export function validateJobForm(d: JobFormData): JobFormErrors {
 interface JobFormProps {
   /** Pre-fill values for edit mode. Omit for create mode. */
   initialData?: Partial<JobFormData>;
+  /** Saved attachment paths from the server (edit mode). */
+  existingDocs?: ExistingDocs;
   /** Called with the validated, trimmed form values when submitted. */
   onSubmit: (data: JobFormData) => void;
   /** Disables inputs and shows a loading label on the submit button. */
@@ -249,10 +275,16 @@ interface JobFormProps {
   heading: string;
   submitLabel: string;
   submitLoadingLabel: string;
+  /** Kept for compatibility with the edit page; validation now uses existingDocs. */
+  isEdit?: boolean;
 }
+
+// Where uploaded files are served from. Set NEXT_PUBLIC_API_URL in .env.local
+const FILE_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function JobForm({
   initialData,
+  existingDocs = {},
   onSubmit,
   isSubmitting,
   submitError = null,
@@ -321,21 +353,56 @@ export default function JobForm({
     clearError(field);
   };
 
-  // File inputs
+  // File inputs — choosing a new file replaces the saved one, so cancel any removal
   const handleFileChange = (
     field: "attachment_1_doc" | "attachment_2_doc",
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0] ?? null;
-    setFormData((prev) => ({ ...prev, [field]: file }));
+    const removeKey =
+      field === "attachment_1_doc"
+        ? "attachment_1_remove"
+        : "attachment_2_remove";
+
+    setFormData((prev) => ({ ...prev, [field]: file, [removeKey]: false }));
     clearError(field);
     clearError(field.replace("_doc", "_title"));
+  };
+
+  // Mark the saved file for deletion (actually deleted when the form is saved)
+  const handleRemoveExisting = (n: 1 | 2) => {
+    setFormData((prev) =>
+      n === 1
+        ? {
+            ...prev,
+            attachment_1_remove: true,
+            attachment_1_doc: null,
+            attachment_1_title: "",
+          }
+        : {
+            ...prev,
+            attachment_2_remove: true,
+            attachment_2_doc: null,
+            attachment_2_title: "",
+          },
+    );
+    clearError(`attachment_${n}_doc`);
+    clearError(`attachment_${n}_title`);
+  };
+
+  // Undo a removal before saving
+  const handleUndoRemove = (n: 1 | 2) => {
+    setFormData((prev) =>
+      n === 1
+        ? { ...prev, attachment_1_remove: false }
+        : { ...prev, attachment_2_remove: false },
+    );
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    const found = validateJobForm(formData);
+    const found = validateJobForm(formData, existingDocs);
     setErrors(found);
 
     const firstKey = Object.keys(found).find((k) => found[k]);
@@ -597,6 +664,14 @@ export default function JobForm({
           {([1, 2] as const).map((n) => {
             const titleKey = `attachment_${n}_title` as const;
             const docKey = `attachment_${n}_doc` as const;
+            const removeKey = `attachment_${n}_remove` as const;
+
+            const existingPath = existingDocs[docKey] ?? null;
+            const removed = formData[removeKey];
+            const newFile = formData[docKey];
+            const showExisting = !!existingPath && !removed && !newFile;
+            const showRemovedNotice = !!existingPath && removed && !newFile;
+
             return (
               <div
                 key={n}
@@ -636,7 +711,7 @@ export default function JobForm({
                         className="cursor-pointer whitespace-nowrap px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
                         style={{ background: flameGradient }}
                       >
-                        Choose File
+                        {showExisting ? "Replace File" : "Choose File"}
                         <input
                           type="file"
                           name={docKey}
@@ -647,10 +722,48 @@ export default function JobForm({
                         />
                       </label>
                       <span className="truncate px-3 text-xs text-slate-500">
-                        {formData[docKey]?.name ?? "No file chosen"}
+                        {newFile?.name ??
+                          (showExisting
+                            ? existingPath!.split("/").pop()
+                            : "No file chosen")}
                       </span>
                     </div>
                     <FieldError name={docKey} message={errors[docKey]} />
+
+                    {showExisting && (
+                      <div className="mt-1.5 flex items-center gap-3 text-xs">
+                        <a
+                          href={`${FILE_BASE_URL}${existingPath}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#1C6FD9] hover:underline"
+                        >
+                          View current file
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExisting(n)}
+                          disabled={isSubmitting}
+                          className="text-slate-400 transition hover:text-red-500"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+
+                    {showRemovedNotice && (
+                      <div className="mt-1.5 flex items-center gap-3 text-xs text-slate-500">
+                        <span>Current file will be deleted when you save.</span>
+                        <button
+                          type="button"
+                          onClick={() => handleUndoRemove(n)}
+                          disabled={isSubmitting}
+                          className="text-[#1C6FD9] hover:underline"
+                        >
+                          Undo
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

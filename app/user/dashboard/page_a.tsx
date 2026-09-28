@@ -2493,24 +2493,23 @@ export default function ProfileTabs() {
     >
       <div className="mb-6 flex items-center gap-3">
         <div
-          className="w-52 h-10 rounded-lg flex items-center justify-center shrink-0"
-        //   style={{ background: flameGradient }}
+          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: flameGradient }}
         >
-          {/* <Flame
+          <Flame
             className="w-5 h-5 text-white"
             fill="white"
             fillOpacity={0.25}
-          /> */}
-          <img src="/assests/logo-full.png" alt="" />
+          />
         </div>
-        {/* <div>
+        <div>
           <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
             Candidate profile
           </h1>
           <p className="text-sm text-slate-500">
             Keep your profile up to date to be considered for new openings.
           </p>
-        </div> */}
+        </div>
       </div>
       {jobId && exists && progressPercentage != 0 && (
         <ProgressBar progress={progressPercentage} />
