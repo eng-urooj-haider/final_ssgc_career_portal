@@ -40,48 +40,49 @@ enum JobType {
 // -----------------------------------------------------------------------------
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique @db.VarChar(191)
-  password  String   @db.VarChar(255)
-  role      Role     @default(USER)
-  profile   Profile?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id              Int              @id @default(autoincrement())
+  email           String           @unique @db.VarChar(191)
+  password        String           @db.VarChar(255)
+  role            Role             @default(USER)
+  profile         Profile?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  jobApplications JobApplication[]
 
   @@map("users")
 }
 
 model Profile {
-  id                  Int            @id @default(autoincrement())
-  userId              Int            @unique @map("user_id")
-  firstName           String?        @map("first_name") @db.VarChar(100)
-  lastName            String?        @map("last_name") @db.VarChar(100)
-  gender              Gender?
-  fatherName          String?        @map("father_name") @db.VarChar(100)
-  maritalStatus       MaritalStatus? @map("marital_status")
-  childrenCount       Int?           @default(0) @map("children_count")
-  dateOfBirth         DateTime?      @map("date_of_birth") @db.Date
-  birthCountryId      Int?           @map("birth_country_id")
-  birthCityId         Int?           @map("birth_city_id")
-  birthCityOther      String?        @map("birth_city_other") @db.VarChar(100)
-  isPakistani         Boolean        @default(true) @map("is_pakistani")
-  cnic                String?        @map("cnic") @db.VarChar(20)
-  userPic             String?        @map("user_pic")
-  passportNo          String?        @map("passport_no") @db.VarChar(20)
-  domicile            String?        @map("domicile") @db.VarChar(50)
-  mobilePrefix        String?        @map("mobile_prefix") @db.VarChar(10)
-  mobileNumber        String?        @map("mobile_number") @db.VarChar(20)
-  homePrefix          String?        @map("home_prefix") @db.VarChar(10)
-  homeNumber          String?        @map("home_number") @db.VarChar(20)
-  officePrefix        String?        @map("office_prefix") @db.VarChar(10)
-  officeNumber        String?        @map("office_number") @db.VarChar(20)
-  currentAddress      String?        @map("current_address") @db.Text
-  permanentAddress    String?        @map("permanent_address") @db.Text
-  alreadyWorkedSsgc   Boolean        @default(false) @map("already_worked_ssgc")
-  ssgcEmployeeName    String?        @map("ssgc_employee_name") @db.VarChar(100)
-  ssgcEmployeeNumber  String?        @map("ssgc_employee_number") @db.VarChar(20)
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
+  id                 Int            @id @default(autoincrement())
+  userId             Int            @unique @map("user_id")
+  firstName          String?        @map("first_name") @db.VarChar(100)
+  lastName           String?        @map("last_name") @db.VarChar(100)
+  gender             Gender?
+  fatherName         String?        @map("father_name") @db.VarChar(100)
+  maritalStatus      MaritalStatus? @map("marital_status")
+  childrenCount      Int?           @default(0) @map("children_count")
+  dateOfBirth        DateTime?      @map("date_of_birth") @db.Date
+  birthCountryId     Int?           @map("birth_country_id")
+  birthCityId        Int?           @map("birth_city_id")
+  birthCityOther     String?        @map("birth_city_other") @db.VarChar(100)
+  isPakistani        Boolean        @default(true) @map("is_pakistani")
+  cnic               String?        @map("cnic") @db.VarChar(20)
+  userPic            String?        @map("user_pic")
+  passportNo         String?        @map("passport_no") @db.VarChar(20)
+  domicile           String?        @map("domicile") @db.VarChar(50)
+  mobilePrefix       String?        @map("mobile_prefix") @db.VarChar(10)
+  mobileNumber       String?        @map("mobile_number") @db.VarChar(20)
+  homePrefix         String?        @map("home_prefix") @db.VarChar(10)
+  homeNumber         String?        @map("home_number") @db.VarChar(20)
+  officePrefix       String?        @map("office_prefix") @db.VarChar(10)
+  officeNumber       String?        @map("office_number") @db.VarChar(20)
+  currentAddress     String?        @map("current_address") @db.Text
+  permanentAddress   String?        @map("permanent_address") @db.Text
+  alreadyWorkedSsgc  Boolean        @default(false) @map("already_worked_ssgc")
+  ssgcEmployeeName   String?        @map("ssgc_employee_name") @db.VarChar(100)
+  ssgcEmployeeNumber String?        @map("ssgc_employee_number") @db.VarChar(20)
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
 
   // Relations
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -120,7 +121,7 @@ model Job {
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   profileCompletion ProfileCompletion @relation(fields: [profileCompletionId], references: [id], onDelete: Restrict)
-
+  jobApplications   JobApplication[]
   @@index([profileCompletionId])
   @@map("jobs")
 }
@@ -281,7 +282,7 @@ model Membership {
 
 model ProfileCompletion {
   id          Int       @id @default(autoincrement())
-  name String @unique @db.VarChar(255)
+  name        String    @unique @db.VarChar(255)
   image       Boolean   @default(false)
   personal    Boolean   @default(false)
   experience  Boolean   @default(false)
@@ -294,4 +295,21 @@ model ProfileCompletion {
   jobs        Job[]
 
   @@map("profile_completions")
+}
+
+model JobApplication {
+  id                     Int      @id @default(autoincrement())
+  userId                 Int
+  user                   User     @relation(fields: [userId], references: [id])
+  jobId                  Int
+  job                    Job      @relation(fields: [jobId], references: [id])
+  selectedExperienceIds  Json     @default("[]")
+  selectedCertificateIds Json     @default("[]")
+  doc1Path               String?
+  doc2Path               String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([userId, jobId])
+  @@map("job_applications")
 }
