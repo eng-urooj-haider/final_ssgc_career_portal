@@ -40,7 +40,7 @@ function validateFile(file: FormDataEntryValue | null): string | null {
 async function saveFile(file: FormDataEntryValue | null, jobCode: string) {
   if (!(file instanceof File) || file.size === 0) return null;
   const folder = `job-${safeSegment(jobCode)}/attachments`;
-  const dir = path.join(process.cwd(), "public", "uploads", folder);
+  const dir = path.join(process.cwd(), "public", "uploads", "jobs", folder);
   await mkdir(dir, { recursive: true });
   const filename = `${Date.now()}-${safeFilename(file.name)}`;
   await writeFile(
@@ -48,7 +48,7 @@ async function saveFile(file: FormDataEntryValue | null, jobCode: string) {
     Buffer.from(await file.arrayBuffer()),
   );
   // Must fit in VarChar(255)
-  return `/uploads/${folder}/${filename}`;
+  return `/uploads/jobs/${folder}/${filename}`;
 }
 
 export const GET = async (req: NextRequest) => {
@@ -102,8 +102,6 @@ export const GET = async (req: NextRequest) => {
 export const POST = async (req: NextRequest) => {
   const savedFiles: string[] = [];
   try {
-    // TODO: check session / role here and return 401/403
-
     const data = await req.formData();
 
     const jobCode = String(data.get("job_code") ?? "").trim();

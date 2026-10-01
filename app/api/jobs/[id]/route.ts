@@ -38,7 +38,7 @@ const optStr = (v: FormDataEntryValue | null, max?: number): string | null => {
   return max ? t.slice(0, max) : t;
 };
 
-const UPLOAD_ROOT = path.resolve(process.cwd(), "public", "uploads");
+const UPLOAD_ROOT = path.resolve(process.cwd(), "public", "uploads","jobs");
 
 function validateFile(file: FormDataEntryValue | null): string | null {
   if (!(file instanceof File) || file.size === 0) return null;
@@ -50,7 +50,7 @@ function validateFile(file: FormDataEntryValue | null): string | null {
 
 async function saveFile(file: FormDataEntryValue | null, jobCode: string) {
   if (!(file instanceof File) || file.size === 0) return null;
-  const folder = `job-${safeSegment(jobCode)}`;
+  const folder = `job-${safeSegment(jobCode)}/attachments`;
   const dir = path.join(UPLOAD_ROOT, folder);
   await mkdir(dir, { recursive: true });
   const filename = `${Date.now()}-${safeFilename(file.name)}`;
@@ -58,7 +58,7 @@ async function saveFile(file: FormDataEntryValue | null, jobCode: string) {
     path.join(dir, filename),
     Buffer.from(await file.arrayBuffer()),
   );
-  return `/uploads/${folder}/${filename}`; // must fit VarChar(255)
+  return `/uploads/jobs/${folder}/${filename}`; // must fit VarChar(255)
 }
 
 // Best-effort delete; refuses anything outside public/uploads

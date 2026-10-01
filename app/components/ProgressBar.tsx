@@ -8,6 +8,7 @@ interface ProgressBarProps {
 }
 
 export function ProgressBar({ progress = 0 }: ProgressBarProps) {
+  console.log('progress',progress)
   // Clamp value between 0 and 100
   const clampedProgress = Math.min(100, Math.max(0, progress));
 

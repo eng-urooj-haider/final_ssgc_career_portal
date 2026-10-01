@@ -10,8 +10,8 @@ interface RegisterBody {
   password: string;
   role?: Role;
   cnic: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   gender: Gender; // Matches Gender enum ("MALE" | "FEMALE" | "OTHER")
 }
 
@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
         profile: {
           create: {
             cnic: body.cnic,
-            firstName: body.first_name,  // Mapped to camelCase
-            lastName: body.last_name,    // Mapped to camelCase
+            firstName: body.firstName,  // Mapped to camelCase
+            lastName: body.lastName,    // Mapped to camelCase
             gender: body.gender,        // Valid Enum value
           },
         },

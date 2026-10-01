@@ -304,18 +304,15 @@ export default function JobApplicationConfirmPage() {
       if (doc1) body.append("doc_1", doc1);
       if (doc2) body.append("doc_2", doc2);
       body.append("job_id", jobId);
-
       await axios.post("/api/applications/finish", body, {
         withCredentials: true,
       });
 
-      await queryClient.invalidateQueries({ queryKey: ["applications"] });
-      router.push("/applications/confirmation");
+    //   await queryClient.invalidateQueries({ queryKey: ["applications"] });
+    //   router.push("/applications/confirmation");
     } catch (err) {
       console.error("Application submission failed", err);
-      setSubmitError(
-        "Something went wrong while submitting your application.",
-      );
+      setSubmitError("Something went wrong while submitting your application.");
     } finally {
       setSubmitting(false);
     }

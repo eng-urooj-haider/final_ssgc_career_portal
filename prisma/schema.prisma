@@ -60,7 +60,7 @@ model Profile {
   gender             Gender?
   fatherName         String?        @map("father_name") @db.VarChar(100)
   maritalStatus      MaritalStatus? @map("marital_status")
-  childrenCount      Int?           @default(0) @map("children_count")
+  childrenCount      Int?            @map("children_count")
   dateOfBirth        DateTime?      @map("date_of_birth") @db.Date
   birthCountryId     Int?           @map("birth_country_id")
   birthCityId        Int?           @map("birth_city_id")

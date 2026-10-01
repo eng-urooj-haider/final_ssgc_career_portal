@@ -500,11 +500,12 @@ function PersonalTab({
 
   React.useEffect(() => {
     if (profile) {
+      console.log('childrenCount',profile.childrenCount)
       setFormData((prev) => ({
         ...prev,
         father_name: profile.fatherName ?? "",
         marital_status: profile.maritalStatus ?? "",
-        children: profile.childrenCount ?? 0,
+        children: profile.childrenCount ?? '',
         date_of_birth: profile.dateOfBirth ?? "",
         birth_country: profile.birthCountryId ?? "",
         birth_city: profile.birthCityId ?? "",
@@ -567,11 +568,11 @@ function PersonalTab({
         <Field label="No. of Children" required error={errors.children}>
           <select
             name="children"
-            value={formData.children || 0}
+            value={formData.children}
             onChange={onChange}
             className="w-full rounded-md border text-black border-gray-300 p-2 text-sm"
           >
-            <option value="">Select</option>
+            <option value="">Select Children</option>
             <option value="0">0</option>
             <option value="1">1</option>
             <option value="2">2</option>
@@ -1816,7 +1817,7 @@ export function calculateProfileProgress(job, profile) {
   }
 
   // 2. Personal Detail Check (Checking core required field like fatherName/CNIC/mobile)
-  if (rules.personal && Boolean(profile.fatherName || profile.cnic)) {
+  if (rules.personal && Boolean(profile.fatherName)) {
     completedCount++;
   }
 
@@ -1869,11 +1870,12 @@ export default function ProfileTabs() {
 
   const { data: profile } = useUserProfile();
   const { jobId, job, exists, isLoading } = useFindingId();
+  console.log(job)
   const progressPercentage = useMemo(
     () => calculateProfileProgress(job, profile),
     [job, profile],
   );
-  console.log(progressPercentage);
+  console.log('progressPercentage',progressPercentage)
   function validate() {
     const newErrors: Record<string, string> = {};
 

@@ -41,8 +41,7 @@ export async function GET(req: NextRequest) {
         memberships: {
           orderBy: { memberSince: "desc" },
         },
-        certificates: {
-        },
+        certificates: {},
       },
     });
 
