@@ -310,7 +310,7 @@ export default function JobApplicationConfirmPage() {
       });
 
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
-      router.push("/applications/confirmation");
+      // router.push("/applications/confirmation");
     } catch (err) {
       console.error("Application submission failed", err);
       setSubmitError(

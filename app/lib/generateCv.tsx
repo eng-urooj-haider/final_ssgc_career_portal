@@ -245,7 +245,11 @@ function CvDocument({ data }: { data: CvData }) {
             <Text style={styles.nameLine}>
               Position Applied For: {data.positionAppliedFor}
             </Text>
+            <Text style={styles.nameLine}>
+              Position Applied For: {data.positionAppliedFor}
+            </Text>
           </View>
+          
           <View style={styles.photoBox}>
             {data.photoUrl ? (
               <Image src={data.photoUrl} style={{ width: 70, height: 80 }} />
@@ -352,7 +356,7 @@ function CvDocument({ data }: { data: CvData }) {
 
 export async function buildCvPdf(input: CvInput): Promise<Buffer> {
   const { profile, job, application } = input;
-
+console.log(input)
   const data: CvData = {
     fullName: `${profile.firstName} ${profile.lastName}`.trim(),
     positionAppliedFor: job.title,
