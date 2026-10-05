@@ -60,7 +60,7 @@ model Profile {
   gender             Gender?
   fatherName         String?        @map("father_name") @db.VarChar(100)
   maritalStatus      MaritalStatus? @map("marital_status")
-  childrenCount      Int?            @map("children_count")
+  childrenCount      Int?           @map("children_count")
   dateOfBirth        DateTime?      @map("date_of_birth") @db.Date
   birthCountryId     Int?           @map("birth_country_id")
   birthCityId        Int?           @map("birth_city_id")
@@ -122,6 +122,7 @@ model Job {
 
   profileCompletion ProfileCompletion @relation(fields: [profileCompletionId], references: [id], onDelete: Restrict)
   jobApplications   JobApplication[]
+
   @@index([profileCompletionId])
   @@map("jobs")
 }
@@ -185,6 +186,7 @@ model QualificationGroup {
   qualificationDetails QualificationDetail[]
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
+  education            Education[]
 
   @@map("qualification_groups")
 }
@@ -197,6 +199,7 @@ model Qualification {
   qualificationDetails QualificationDetail[]
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
+  education            Education[]
 
   @@index([qualificationGroupId])
   @@map("qualifications")
@@ -208,6 +211,7 @@ model Institution {
   qualificationDetails QualificationDetail[]
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
+  education            Education[]
 
   @@map("institutions")
 }
@@ -232,24 +236,31 @@ model Country {
 }
 
 model Education {
-  id                   Int      @id @default(autoincrement())
-  profileId            Int      @map("profile_id")
+  id                   Int                @id @default(autoincrement())
+  profileId            Int                @map("profile_id")
   qualificationGroupId Int
-  qualificationId      Int      @map("qualification_id")
-  institutionId        Int      @map("institution_id")
-  instituteOther       String?  @map("institution_other")
-  majorSubject         String   @map("major_subject")
-  countryId            Int      @map("country_id")
-  divisionGrade        String?  @map("division_grade")
-  cityId               Int?     @map("city_id")
-  cityOther            String?  @map("city_other")
-  passingYear          Int      @map("passing_year")
-  obtainedMarks        Float    @map("obtained_marks")
-  totalMarks           Float    @map("total_marks")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-  profile              Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  qualificationId      Int                @map("qualification_id")
+  institutionId        Int                @map("institution_id")
+  instituteOther       String?            @map("institution_other")
+  majorSubject         String             @map("major_subject")
+  countryId            Int                @map("country_id")
+  divisionGrade        String?            @map("division_grade")
+  cityId               Int?               @map("city_id")
+  cityOther            String?            @map("city_other")
+  passingYear          Int                @map("passing_year")
+  obtainedMarks        Float              @map("obtained_marks")
+  totalMarks           Float              @map("total_marks")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  profile              Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  qualificationGroup   QualificationGroup @relation(fields: [qualificationGroupId], references: [id])
+  qualification        Qualification      @relation(fields: [qualificationId], references: [id])
+  institution          Institution        @relation(fields: [institutionId], references: [id])
 
+  @@index([profileId])
+  @@index([qualificationGroupId])
+  @@index([qualificationId])
+  @@index([institutionId])
   @@map("educations")
 }
 

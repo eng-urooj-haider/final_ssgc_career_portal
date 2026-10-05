@@ -49,6 +49,7 @@ async function saveFile(file: FormDataEntryValue | null, jobCode: string) {
   );
   // Must fit in VarChar(255)
   return `/uploads/jobs/${folder}/${filename}`;
+  return `/uploads/jobs/${folder}/${filename}`;
 }
 
 export const GET = async (req: NextRequest) => {

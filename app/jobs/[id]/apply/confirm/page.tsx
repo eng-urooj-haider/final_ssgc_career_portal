@@ -308,8 +308,8 @@ export default function JobApplicationConfirmPage() {
         withCredentials: true,
       });
 
-    //   await queryClient.invalidateQueries({ queryKey: ["applications"] });
-    //   router.push("/applications/confirmation");
+      await queryClient.invalidateQueries({ queryKey: ["applications"] });
+      // router.push("/applications/confirmation");
     } catch (err) {
       console.error("Application submission failed", err);
       setSubmitError("Something went wrong while submitting your application.");
