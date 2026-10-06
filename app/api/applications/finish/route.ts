@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     const profile = await prisma.profile.findUnique({
       where: { userId },
       include: {
+        user: { select: { email: true } },
         experiences: true,
         education: {
           include: {
@@ -176,6 +177,7 @@ export async function POST(req: NextRequest) {
     const pdfBuffer = await buildCvPdf({
       profile: {
         ...profile,
+        email: profile.user.email,
         userPic: userPicDataUri,
       },
       job: {

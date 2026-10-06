@@ -500,13 +500,15 @@ function PersonalTab({
 
   React.useEffect(() => {
     if (profile) {
-      console.log('childrenCount',profile.childrenCount)
+      console.log("childrenCount", profile.childrenCount);
       setFormData((prev) => ({
         ...prev,
         father_name: profile.fatherName ?? "",
         marital_status: profile.maritalStatus ?? "",
-        children: profile.childrenCount ?? '',
-        date_of_birth: profile.dateOfBirth ?? "",
+        children: profile.childrenCount ?? "",
+        date_of_birth: profile.dateOfBirth
+          ? String(profile.dateOfBirth).split("T")[0]
+          : "",
         birth_country: profile.birthCountryId ?? "",
         birth_city: profile.birthCityId ?? "",
         birth_city_other: profile.birthCityOther ?? "",
@@ -1870,12 +1872,12 @@ export default function ProfileTabs() {
 
   const { data: profile } = useUserProfile();
   const { jobId, job, exists, isLoading } = useFindingId();
-  console.log(job)
+  console.log(job);
   const progressPercentage = useMemo(
     () => calculateProfileProgress(job, profile),
     [job, profile],
   );
-  console.log('progressPercentage',progressPercentage)
+  console.log("progressPercentage", progressPercentage);
   function validate() {
     const newErrors: Record<string, string> = {};
 

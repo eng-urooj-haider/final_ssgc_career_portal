@@ -504,7 +504,7 @@ export async function buildCvPdf(input: CvInput): Promise<Buffer> {
       `${profile.mobilePrefix ?? ""}${profile.mobileNumber ?? ""}` || "-",
     email: profile.email ?? "-",
     dateOfBirth: fmtDate(profile.dateOfBirth),
-    nationality: profile.nationality ?? "-",
+    nationality: profile.isPakistani == "1" ? "Yes" : "No",
     homeAddress: profile.currentAddress ?? "-",
     cnic: profile.cnic ?? "-",
     professionalSummary: profile.professionalSummary ?? "",
