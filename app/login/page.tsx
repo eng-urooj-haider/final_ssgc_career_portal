@@ -72,10 +72,28 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Touched>({});
 
+  // const LoginMutation = useMutation({
+  //   mutationFn: LoginUser,
+  //   onSuccess: () => {
+  //     router.push("user/dashboard");
+  //   },
+  //   onError: (err: AxiosError<ApiErrorResponse>) => {
+  //     console.log("Login error:", err.response?.data?.message ?? err.message);
+  //   },
+  // });
   const LoginMutation = useMutation({
     mutationFn: LoginUser,
     onSuccess: () => {
-      router.push("/dashboard");
+      const redirect = new URLSearchParams(window.location.search).get(
+        "redirect",
+      );
+
+      const target =
+        redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+          ? redirect
+          : "/user/dashboard";
+
+      window.location.assign(target); // replaces router.push + router.refresh
     },
     onError: (err: AxiosError<ApiErrorResponse>) => {
       console.log("Login error:", err.response?.data?.message ?? err.message);

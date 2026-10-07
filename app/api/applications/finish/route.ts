@@ -193,18 +193,30 @@ export async function POST(req: NextRequest) {
 
     const cvDir = path.join(UPLOAD_ROOT, `job-${job.jobCode}`, "cv");
     await mkdir(cvDir, { recursive: true });
-    await writeFile(
-      path.join(
-        cvDir,
-        `${profile.firstName}-${profile.lastName}-${profile.cnic}.pdf`,
-      ),
-      pdfBuffer,
-    );
+    const clean = (v: string | null) =>
+      (v ?? "").trim().replace(/[^a-zA-Z0-9-]+/g, "-");
+    const cvFilename = `${clean(profile.firstName)}-${clean(profile.lastName)}-${clean(profile.cnic)}.pdf`;
+    await writeFile(path.join(cvDir, cvFilename), pdfBuffer);
+    // await writeFile(
+    //   path.join(
+    //     cvDir,
+    //     `${profile.firstName}-${profile.lastName}-${profile.cnic}.pdf`,
+    //   ),
+    //   pdfBuffer,
+    // );
+    const cvPath = `/uploads/jobs/job-${job.jobCode}/cv/${cvFilename}`;
+    await prisma.jobApplication.update({
+      where: { id: application.id },
+      data: { cv: cvPath },
+    });
 
     return NextResponse.json(
       {
         message: "Application submitted successfully",
-        data: { id: application.id },
+        data: {
+          id: application.id,
+          redirectTo: `/user/application-success/${application.id}`,
+        },
       },
       { status: 201 },
     );

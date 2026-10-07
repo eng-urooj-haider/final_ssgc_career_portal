@@ -329,7 +329,7 @@ interface PhotoTabProps {
   error?: string;
 }
 
-function PhotoTab({ image, onChange, error }: PhotoTabProps) {
+function PhotoTab({ image, onChange, error, canAdd = true }: PhotoTabProps) {
   const [preview, setPreview] = useState<string | null>(image || null);
   const [hasLocalSelection, setHasLocalSelection] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -400,36 +400,38 @@ function PhotoTab({ image, onChange, error }: PhotoTabProps) {
             )}
           </div>
           <div>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-              style={{ background: flameGradient }}
-            >
-              <Upload className="w-4 h-4" />
-              Upload photo
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFile}
-              className="hidden"
-              aria-label="Upload profile photo"
-            />
-            <p className="mt-2 text-xs text-slate-500">
-              JPG or PNG. Square image, at least 400×400px.
-            </p>
+            {canAdd && (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                style={{ background: flameGradient }}
+              >
+                <Upload className="w-4 h-4" />
+                Upload photo
+              </button>
+            )}
+            {canAdd && (
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFile}
+                className="hidden"
+                aria-label="Upload profile photo"
+              />
+            )}
+            {canAdd && (
+              <p className="mt-2 text-xs text-slate-500">
+                JPG or PNG. Square image, at least 400×400px.
+              </p>
+            )}
+
             {isLoadingProfile && !hasLocalSelection && (
               <p className="mt-1 text-xs text-slate-400">
                 Loading current photo…
               </p>
             )}
-            {/* {isProfileError && !hasLocalSelection && (
-              <p className="mt-1 text-xs text-red-400">
-                Couldn't load your current photo.
-              </p>
-            )} */}
           </div>
         </div>
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
@@ -710,7 +712,7 @@ function PersonalTab({
           <Field
             label="Code"
             className="w-1/3"
-            required
+            // required
             error={errors.office_prefix}
           >
             <FlameInput
@@ -726,7 +728,7 @@ function PersonalTab({
           <Field
             label="Office Phone"
             className="w-2/3"
-            required
+            // required
             error={errors.office_number}
           >
             <FlameInput
@@ -897,6 +899,7 @@ interface ExperienceEntry {
   responsibilities: string;
   reason: string;
   city_other: string;
+  canAdd?: boolean;
 }
 
 const emptyExperience = (id: number): ExperienceEntry => ({
@@ -934,6 +937,7 @@ function ExperienceTab({
   onAdd,
   onRemove,
   errors,
+  canAdd = true,
 }: ExperienceTabProps) {
   console.log("entries", entries);
   const { data: profile } = useUserProfile();
@@ -978,7 +982,7 @@ function ExperienceTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries?.length === 1}
+            removeDisabled={entries?.length === 1 || !canAdd}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1103,9 +1107,11 @@ function ExperienceTab({
           </RepeatableCard>
         ))}
       </div>
-      <div className="mt-4">
-        <AddButton label="Add another position" onClick={onAdd} />
-      </div>
+      {canAdd && (
+        <div className="mt-4">
+          <AddButton label="Add another experience" onClick={onAdd} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1389,6 +1395,7 @@ interface EducationTabProps {
   onRemove: (id: number) => void;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   errors: Record<string, string>;
+  canAdd?: boolean;
 }
 
 export function EducationTab({
@@ -1398,6 +1405,7 @@ export function EducationTab({
   onRemove,
   setFormData,
   errors,
+  canAdd = true,
 }: EducationTabProps) {
   const { data: qualificationGroups = [], isLoading: isLoadingGroups } =
     useQuery({
@@ -1461,10 +1469,11 @@ export function EducationTab({
             isLoadingInstitutes={isLoadingInstitutes}
           />
         ))}
-
-        <div className="pt-2">
-          <AddButton onClick={onAdd} label="Add another education" />
-        </div>
+        {canAdd && (
+          <div className="pt-2">
+            <AddButton onClick={onAdd} label="Add another education" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1499,6 +1508,7 @@ interface CertificatesTabProps {
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
+  canAdd?: boolean;
 }
 
 export function CertificatesTab({
@@ -1508,6 +1518,7 @@ export function CertificatesTab({
   onRemove,
   setFormData,
   errors,
+  canAdd = true,
 }: CertificatesTabProps) {
   const { data: profile } = useUserProfile();
   const profileCertificates = profile?.certificates;
@@ -1551,7 +1562,7 @@ export function CertificatesTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries?.length === 1}
+            removeDisabled={entries?.length === 1 || !canAdd}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1621,7 +1632,7 @@ export function CertificatesTab({
                     />
                   </label>
 
-                  {entry.document && (
+                  {(entry.document &&  canAdd) && (
                     <button
                       type="button"
                       onClick={() => onFieldChange(entry.id, "document", null)}
@@ -1637,9 +1648,11 @@ export function CertificatesTab({
           </RepeatableCard>
         ))}
       </div>
-      <div className="mt-4">
-        <AddButton label="Add another certification" onClick={onAdd} />
-      </div>
+      {canAdd && (
+        <div className="mt-4">
+          <AddButton label="Add another certification" onClick={onAdd} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1672,6 +1685,7 @@ interface MembershipsTabProps {
   onAdd: () => void;
   onRemove: (id: number) => void;
   errors: Record<string, string>;
+  canAdd?: boolean;
 }
 
 function MembershipsTab({
@@ -1681,6 +1695,7 @@ function MembershipsTab({
   onRemove,
   errors,
   setFormData,
+  canAdd = true,
 }: MembershipsTabProps) {
   const { data: profile } = useUserProfile();
   const memberships = profile?.memberships;
@@ -1709,7 +1724,7 @@ function MembershipsTab({
           <RepeatableCard
             key={entry.id}
             onRemove={() => onRemove(entry.id)}
-            removeDisabled={entries?.length === 1}
+            removeDisabled={entries?.length === 1 || !canAdd}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
               <Field
@@ -1753,9 +1768,11 @@ function MembershipsTab({
           </RepeatableCard>
         ))}
       </div>
-      <div className="mt-4">
-        <AddButton label="Add another membership" onClick={onAdd} />
-      </div>
+      {canAdd && (
+        <div className="mt-4">
+          <AddButton label="Add another membership" onClick={onAdd} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1872,7 +1889,18 @@ export default function ProfileTabs() {
 
   const { data: profile } = useUserProfile();
   const { jobId, job, exists, isLoading } = useFindingId();
-  console.log(job);
+
+  const { data: applied } = useQuery({
+    queryKey: ["application_status", job?.id],
+    queryFn: async () => {
+      const res = await axios.get(`/api/applications/status?jobId=${job?.id}`, {
+        withCredentials: true,
+      });
+      return res.data as { applied: boolean; applicationId: number | null };
+    },
+    enabled: Boolean(job?.id),
+  });
+
   const progressPercentage = useMemo(
     () => calculateProfileProgress(job, profile),
     [job, profile],
@@ -1900,10 +1928,12 @@ export default function ProfileTabs() {
       if (!formData.marital_status) {
         newErrors.marital_status = "Marital status is required";
       }
-
-      if (!formData.children) {
+      console.log("yes.children");
+      if (!formData.children && formData.children != "0") {
+        console.log("formData.children", formData.children);
         newErrors.children = "Number of children is required";
       }
+      console.log("no.children");
 
       if (!formData.date_of_birth) {
         newErrors.date_of_birth = "Date of birth is required";
@@ -2531,7 +2561,9 @@ export default function ProfileTabs() {
               className="text-sm font-semibold mb-4"
               style={{ color: flame.ink }}
             >
-              You have applied for the following job position:
+              {applied?.applied
+                ? "You have applied for the following job position:"
+                : "You are applying for the following job position:"}
             </p>
             <table className="w-full text-sm text-left border border-slate-200 rounded-md overflow-hidden">
               <thead style={{ background: "#F8FAFC" }}>
@@ -2562,17 +2594,32 @@ export default function ProfileTabs() {
               </tbody>
             </table>
           </div>
-          <p className="text-slate-700">
-            Note: Please review your resume details below before confirming your
-            job application.
-          </p>
-          <Link
-            href={`/jobs/${job?.id}/apply/confirm`}
-            className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            style={{ background: flameGradient }}
-          >
-            Confirm Your Job Application
-          </Link>
+          {!applied?.applied && (
+            <p className="text-slate-700">
+              Note: Please review your resume details below before confirming
+              your job application.
+            </p>
+          )}
+          {!applied?.applied && (
+            <p className="text-slate-700">
+              Note: Please review your resume details below before confirming
+              your job application.
+            </p>
+          )}
+
+          {applied?.applied ? (
+            <p className="mt-3 inline-block rounded-md bg-green-50 px-4 py-2 text-sm font-medium text-green-700">
+              You have already applied for this position.
+            </p>
+          ) : (
+            <Link
+              href={`/jobs/${job?.id}/apply/confirm`}
+              className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              style={{ background: flameGradient }}
+            >
+              Confirm Your Job Application
+            </Link>
+          )}
         </div>
       )}
 
@@ -2636,6 +2683,7 @@ export default function ProfileTabs() {
                 image={typeof formData.image === "string" ? formData.image : ""}
                 onChange={handleImageChange}
                 error={errors.image}
+                canAdd={!applied?.applied}
               />
             )}
             {activeTab === "personal" && (
@@ -2651,6 +2699,7 @@ export default function ProfileTabs() {
                 entries={formData.experience}
                 errors={errors}
                 setFormData={setFormData}
+                canAdd={!applied?.applied}
                 {...experienceHandlers}
               />
             )}
@@ -2660,6 +2709,7 @@ export default function ProfileTabs() {
                 errors={errors}
                 setFormData={setFormData}
                 {...educationHandlers}
+                canAdd={!applied?.applied}
               />
             )}
             {activeTab === "certificates" && (
@@ -2668,6 +2718,7 @@ export default function ProfileTabs() {
                 errors={errors}
                 setFormData={setFormData}
                 {...certificatesHandlers}
+                canAdd={!applied?.applied}
               />
             )}
             {activeTab === "memberships" && (
@@ -2676,6 +2727,7 @@ export default function ProfileTabs() {
                 errors={errors}
                 setFormData={setFormData}
                 {...membershipsHandlers}
+                canAdd={!applied?.applied}
               />
             )}
           </div>
@@ -2692,22 +2744,24 @@ export default function ProfileTabs() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              <button
+              {/* <button
                 type="button"
                 disabled={saving}
                 className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                style={{ background: flameGradient }}
-                onClick={handleSubmit}
-              >
-                {saving ? "Saving..." : "Save changes"}
-              </button>
+              </button> */}
+              {!applied?.applied && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                  style={{ background: flameGradient }}
+                  onClick={handleSubmit}
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
+              )}
             </div>
           </div>
         </div>

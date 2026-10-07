@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PROTECTED = ["/profile", "/dashboard", "/apply", "/jobs/apply","/user"];
 
 export function proxy(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+   const { pathname, search } = req.nextUrl;
   const token = req.cookies.get("token")?.value;
 
   const isProtected = PROTECTED.some(
@@ -14,7 +14,7 @@ export function proxy(req: NextRequest) {
 
   if (isProtected && !token) {
     const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("redirect", pathname); // return here after login
+    loginUrl.searchParams.set("redirect", pathname + search); // return here after login
     return NextResponse.redirect(loginUrl);
   }
 
