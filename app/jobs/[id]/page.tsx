@@ -93,7 +93,10 @@ function Card({
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen px-4 py-10" style={{ background: flame.paper }}>
+    <div
+      className="min-h-screen px-4 py-10"
+      style={{ background: flame.paper }}
+    >
       <div className="mx-auto max-w-6xl">{children}</div>
     </div>
   );
@@ -173,7 +176,9 @@ function Section({
   first?: boolean;
 }) {
   return (
-    <section className={`px-6 py-6 sm:px-8 ${first ? "" : "border-t border-slate-200"}`}>
+    <section
+      className={`px-6 py-6 sm:px-8 ${first ? "" : "border-t border-slate-200"}`}
+    >
       <h2
         className="mb-3 text-sm font-bold uppercase tracking-wide"
         style={{ color: flame.ink }}
@@ -200,7 +205,10 @@ function SideTitle({ children }: { children: React.ReactNode }) {
 
 function DocLink({ title, href }: { title: string; href: string }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-white"
       style={{ background: "#FBFBFA", border: "1px solid #E7E5E1" }}
     >
@@ -289,12 +297,17 @@ export default function JobDetailsPage() {
       <Card accent className="mb-6">
         <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-6 sm:px-8">
           <div className="flex min-w-0 items-start gap-4">
-            <div
+            {/* <div
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg"
               style={{ background: flameGradient }}
             >
               <Briefcase className="h-6 w-6 text-white" />
-            </div>
+            </div> */}
+            <img
+              src="/assests/logo-full.png"
+              className="h-10 w-auto"
+              alt="SSGC logo"
+            />
             <div className="min-w-0">
               <h1
                 className="break-words text-2xl font-semibold"
@@ -335,7 +348,12 @@ export default function JobDetailsPage() {
         <Card className="lg:col-span-2">
           {sections.length > 0 ? (
             sections.map((s, i) => (
-              <Section key={s.title} title={s.title} text={s.text} first={i === 0} />
+              <Section
+                key={s.title}
+                title={s.title}
+                text={s.text}
+                first={i === 0}
+              />
             ))
           ) : (
             <p className="p-8 text-sm text-slate-500">
@@ -373,7 +391,8 @@ export default function JobDetailsPage() {
               )}
               {job.email && (
                 <Fact icon={Mail} label="Apply by email">
-                  <a href={`mailto:${job.email}`}
+                  <a
+                    href={`mailto:${job.email}`}
                     className="break-all text-[#1C6FD9] hover:text-[#F0862E] hover:underline"
                   >
                     {job.email}
@@ -389,7 +408,11 @@ export default function JobDetailsPage() {
                 <SideTitle>Attachments</SideTitle>
                 <div className="space-y-2">
                   {attachments.map((d) => (
-                    <DocLink key={d.title + d.href} title={d.title} href={d.href} />
+                    <DocLink
+                      key={d.title + d.href}
+                      title={d.title}
+                      href={d.href}
+                    />
                   ))}
                 </div>
               </div>

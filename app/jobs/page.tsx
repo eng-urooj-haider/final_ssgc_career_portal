@@ -13,9 +13,7 @@ const columns = [
     header: "#",
     meta: { width: "6%" },
     enableSorting: false,
-    cell: ({ row }) => (
-      <div className="text-slate-500">{row.index + 1}</div>
-    ),
+    cell: ({ row }) => <div className="text-slate-500">{row.index + 1}</div>,
   },
   {
     accessorKey: "jobCode", // was "job_code"
@@ -79,30 +77,22 @@ export default function JobsList() {
       style={{ background: flame.paper }}
     >
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-              style={{ background: flameGradient }}
-            >
-              <Briefcase className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1
-                className="text-xl font-semibold"
-                style={{ color: flame.ink }}
-              >
-                Jobs
-              </h1>
-              <p className="text-sm text-slate-500">
-                View and manage all jobs.
-              </p>
-            </div>
-          </div>
+        {/* Logo */}
+        <div className="mb-4">
+          <img
+            src="/assests/logo-full.png"
+            className="h-16 w-auto"
+            alt="SSGC logo"
+          />
+        </div>
+
+        {/* Text on the left, button on the right */}
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">View and manage all jobs.</p>
 
           <Link
             href="/jobs/create"
-            className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto"
             style={{ background: flameGradient }}
           >
             <Plus className="h-4 w-4" />
@@ -110,6 +100,7 @@ export default function JobsList() {
           </Link>
         </div>
 
+        {/* Table card (unchanged) */}
         <div
           className="overflow-hidden rounded-xl bg-white"
           style={{
@@ -118,7 +109,7 @@ export default function JobsList() {
           }}
         >
           <div className="h-1" style={{ background: flameGradient }} />
-          <div className="p-6">
+          <div className="overflow-x-auto p-6">
             <DataTable
               columns={columns}
               fetchData={getJobs}

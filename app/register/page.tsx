@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios, { AxiosError } from "axios";
 import { useRouter } from "next/navigation";
+import { GradientButton } from "../components/GradientButton";
+import { getSafeRedirect, redirectQuery } from "../lib/redirect";
 
 interface RegisterCredentials {
   email: string;
@@ -48,7 +50,12 @@ const RegisterUser = async (
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // At least 8 chars, one uppercase, one lowercase, one number
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-
+function formatCnic(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 13);
+  if (d.length <= 5) return d;
+  if (d.length <= 12) return `${d.slice(0, 5)}-${d.slice(5)}`;
+  return `${d.slice(0, 5)}-${d.slice(5, 12)}-${d.slice(12)}`;
+}
 function validateField(
   name: keyof RegisterCredentials,
   value: string,
@@ -90,6 +97,7 @@ function validateField(
 
     case "cnic":
       if (!value) return "CNIC is required.";
+      if (!/^\d{13}$/.test(value)) return "Enter a valid 13-digit CNIC.";
       return undefined;
 
     default:
@@ -127,7 +135,8 @@ export default function Page() {
   const RegisterMutation = useMutation({
     mutationFn: RegisterUser,
     onSuccess: () => {
-      router.push("/user/dashboard");
+      // router.push("/user/dashboard");
+      window.location.assign(getSafeRedirect());
     },
     onError: (err: AxiosError<ApiErrorResponse>) => {
       console.log(
@@ -140,8 +149,15 @@ export default function Page() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
     const key = name as keyof RegisterCredentials;
+
+    // CNIC: keep only digits, max 13
+    const value =
+      key === "cnic"
+        ? e.target.value.replace(/\D/g, "").slice(0, 13)
+        : e.target.value;
+
     const updated = { ...formDetail, [key]: value };
     setFormDetail(updated);
 
@@ -166,8 +182,11 @@ export default function Page() {
   const handleBlur = (
     e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
     const key = name as keyof RegisterCredentials;
+    const value =
+      key === "cnic" ? e.target.value.replace(/\D/g, "") : e.target.value;
+
     setTouched((prev) => ({ ...prev, [key]: true }));
     setErrors((prev) => ({
       ...prev,
@@ -187,6 +206,7 @@ export default function Page() {
       firstName: true,
       lastName: true,
       gender: true,
+      cnic: true,
     });
 
     if (Object.keys(validationErrors).length > 0) return;
@@ -211,13 +231,17 @@ export default function Page() {
       <div className="mx-auto flex min-h-[80vh] max-w-lg items-center justify-center">
         <div className="w-full rounded-2xl bg-white p-8 shadow-lg">
           {/* Header */}
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#F5A623] text-lg font-bold text-white shadow-md">
-              SSGC
-            </div>
-            <p className="mt-2 text-sm text-gray-500">
+          <div className="mb-8 text-center flex items-center justify-center">
+            {/* <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#F5A623] text-lg font-bold text-white shadow-md"> */}
+            <img
+              src="/assests/logo-full.png"
+              className="h-20 w-auto"
+              alt="SSGC logo"
+            />
+            {/* </div> */}
+            {/* <p className="mt-2 text-sm text-gray-500">
               Create your SSGC Careers Portal account
-            </p>
+            </p> */}
           </div>
 
           {/* Error Message */}
@@ -403,7 +427,7 @@ export default function Page() {
 
             <div>
               <label
-                htmlFor="lastName"
+                htmlFor="cnic"
                 className="mb-2 block text-sm font-medium text-[#333333]"
               >
                 CNIC
@@ -412,7 +436,7 @@ export default function Page() {
                 id="cnic"
                 name="cnic"
                 type="text"
-                value={formDetail.cnic}
+                value={formatCnic(formDetail.cnic)}
                 onChange={handleChange}
                 onBlur={handleBlur}
                 placeholder="Enter cnic"
@@ -426,7 +450,7 @@ export default function Page() {
             </div>
 
             {/* Register Button */}
-            <button
+            {/* <button
               type="submit"
               disabled={RegisterMutation.isPending}
               className="w-full rounded-lg bg-[#F5A623] px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-[#D88900] focus:outline-none focus:ring-4 focus:ring-[#F5A623]/20 disabled:cursor-not-allowed disabled:opacity-70"
@@ -434,18 +458,34 @@ export default function Page() {
               {RegisterMutation.isPending
                 ? "Creating account..."
                 : "Create Account"}
-            </button>
+            </button> */}
+            <GradientButton
+              type="submit"
+              disabled={RegisterMutation.isPending}
+              className="w-full !rounded-lg !px-6 !py-3 !font-semibold"
+            >
+              {RegisterMutation.isPending
+                ? "Creating account..."
+                : "Create Account"}
+            </GradientButton>
           </form>
 
           {/* Login */}
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{" "}
-            <a
+            {/* <a
               href="/login"
               className="font-semibold text-[#D88900] hover:text-[#F5A623] hover:underline"
             >
               Log In
-            </a>
+            </a> */}
+            <button
+              type="button"
+              onClick={() => router.push(`/login${redirectQuery()}`)}
+              className="font-semibold text-[#D88900] hover:text-[#F5A623] hover:underline cursor-pointer"
+            >
+              Log In
+            </button>
           </p>
         </div>
       </div>

@@ -13,7 +13,10 @@ export default function JobPageShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen px-4 py-10" style={{ background: flame.paper }}>
+    <div
+      className="min-h-screen px-4 py-10"
+      style={{ background: flame.paper }}
+    >
       <div className="mx-auto max-w-4xl">
         <Link
           href="/jobs"
@@ -24,12 +27,17 @@ export default function JobPageShell({
         </Link>
 
         <div className="mb-6 flex items-center gap-3">
-          <div
+          {/* <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
             style={{ background: flameGradient }}
           >
             <Briefcase className="h-5 w-5 text-white" />
-          </div>
+          </div> */}
+          <img
+            src="/assests/logo-full.png"
+            className="h-10 w-auto"
+            alt="SSGC logo"
+          />
           <div>
             <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
               {title}

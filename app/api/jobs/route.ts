@@ -62,7 +62,14 @@ export const GET = async (req: NextRequest) => {
     );
     const search = (searchParams.get("search") ?? "").trim();
 
-    const where = search ? { title: { contains: search } } : {};
+    const where = search
+      ? {
+          OR: [
+            { title: { contains: search } },
+            { jobCode: { contains: search } },
+          ],
+        }
+      : {};
 
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({

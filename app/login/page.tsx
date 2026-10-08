@@ -5,6 +5,7 @@ import Link from "next/link";
 import axios, { AxiosError } from "axios";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { getSafeRedirect, redirectQuery } from "../lib/redirect";
 
 interface LoginFormData {
   email: string;
@@ -83,17 +84,23 @@ export default function LoginPage() {
   // });
   const LoginMutation = useMutation({
     mutationFn: LoginUser,
-    onSuccess: () => {
-      const redirect = new URLSearchParams(window.location.search).get(
-        "redirect",
-      );
+    onSuccess: (res) => {
+      if (res.data.role == "ADMIN") {
+        window.location.assign("/jobs");
+      } else {
+        window.location.assign(getSafeRedirect());
+      }
+      // window.location.assign(getSafeRedirect());
+      // const redirect = new URLSearchParams(window.location.search).get(
+      //   "redirect",
+      // );
 
-      const target =
-        redirect && redirect.startsWith("/") && !redirect.startsWith("//")
-          ? redirect
-          : "/user/dashboard";
+      // const target =
+      //   redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+      //     ? redirect
+      //     : "/user/dashboard";
 
-      window.location.assign(target); // replaces router.push + router.refresh
+      // window.location.assign(target); // replaces router.push + router.refresh
     },
     onError: (err: AxiosError<ApiErrorResponse>) => {
       console.log("Login error:", err.response?.data?.message ?? err.message);
@@ -261,12 +268,19 @@ export default function LoginPage() {
           {/* Register */}
           <p className="mt-6 text-center text-sm text-gray-500">
             Don't have an account?{" "}
-            <Link
-              href="/register"
+            {/* <Link
+              href={`/register${redirectQuery()}`}
               className="font-semibold text-[#D88900] hover:text-[#F5A623] hover:underline"
             >
               Create Account
-            </Link>
+            </Link> */}
+            <button
+              type="button"
+              onClick={() => router.push(`/register${redirectQuery()}`)}
+              className="font-semibold text-[#D88900] hover:text-[#F5A623] hover:underline cursor-pointer"
+            >
+              Create Account
+            </button>
           </p>
         </div>
       </div>

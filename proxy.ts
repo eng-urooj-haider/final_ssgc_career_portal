@@ -2,16 +2,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Pages that need a logged-in user (adjust to your app)
-const PROTECTED = ["/profile", "/dashboard", "/apply", "/jobs/apply","/user"];
+const PROTECTED = ["/profile", "/dashboard", "/apply", "/jobs/apply", "/user"];
 
 export function proxy(req: NextRequest) {
-   const { pathname, search } = req.nextUrl;
+  const { pathname, search } = req.nextUrl;
+  console.log("pathname, search", pathname, search);
   const token = req.cookies.get("token")?.value;
 
   const isProtected = PROTECTED.some(
     (p) => pathname === p || pathname.startsWith(p + "/"),
   );
-
+  if ((pathname === "/login" || pathname === "/register") && token) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
   if (isProtected && !token) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("redirect", pathname + search); // return here after login
@@ -28,5 +31,12 @@ export function proxy(req: NextRequest) {
 
 export const config = {
   // Only run on these paths (skips static files, images, etc.)
-  matcher: ["/profile/:path*", "/dashboard/:path*", "/apply/:path*", "/jobs/apply/:path*", "/login","/user/:path*"],
+  matcher: [
+    "/profile/:path*",
+    "/dashboard/:path*",
+    "/apply/:path*",
+    "/jobs/apply/:path*",
+    "/login",
+    "/user/:path*",
+  ],
 };

@@ -205,10 +205,12 @@ export function validateJobForm(
     e.deadline = "Deadline cannot be before the publication date.";
 
   // Age (optional)
+  if (!d.age) e.age = "Age is required";
+
   if (d.age !== "") {
     const n = Number(d.age);
     if (!Number.isInteger(n) || n < 18 || n > 65)
-      e.age = "Enter a whole number between 18 and 65.";
+      e.age = "Age must be between 18 and 65";
   }
 
   // Rich text
@@ -311,6 +313,9 @@ export default function JobForm({
     // Title: no leading spaces, first letter capital, hard 50-char cap
     if (name === "title") {
       value = capitalizeFirst(value.replace(/^\s+/, "")).slice(0, TITLE_MAX);
+    }
+    if (name === "age") {
+      value = value.replace(/\D/g, "").slice(0, 2);
     }
 
     setFormData((prev) => ({
@@ -589,11 +594,11 @@ export default function JobForm({
             </div>
 
             <div>
-              <FieldLabel htmlFor="age">Age</FieldLabel>
+              <FieldLabel required htmlFor="age">Age</FieldLabel>
               <input
                 id="age"
                 name="age"
-                type="number"
+                type="text"
                 min={18}
                 max={65}
                 step={1}
