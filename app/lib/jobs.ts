@@ -7,6 +7,12 @@ interface FetchJobsParams {
   pageSize: number;
   search: string;
 }
+interface FetchReportParams {
+  pageIndex: number;
+  pageSize: number;
+  search: string;
+  id:number;
+}
 
 interface JobsResponse {
   data: Array<{
@@ -32,6 +38,22 @@ export const getJobs = async ({
       page: pageIndex + 1, // your API is 1-indexed, TanStack Table is 0-indexed
       limit: pageSize,
       search,
+    },
+  });
+  return response.data;
+};
+export const getReport = async ({
+  pageIndex,
+  pageSize,
+  search,
+  id,
+}: FetchReportParams): Promise<JobsResponse> => {
+  const response = await axios.get("/api/reports", {
+    params: {
+      page: pageIndex + 1, // your API is 1-indexed, TanStack Table is 0-indexed
+      limit: pageSize,
+      search,
+      id,
     },
   });
   return response.data;

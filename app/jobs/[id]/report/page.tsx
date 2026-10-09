@@ -3,9 +3,10 @@
 
 import Link from "next/link";
 import { Briefcase, Plus } from "lucide-react";
-import DataTable from "../components/ui/DataTable";
-import { getJobs } from "../lib/jobs";
-import { flame, flameGradient } from "../lib/flameTheme";
+import DataTable from "@/app/components/ui/DataTable";
+import { getJobs, getReport } from "../../../lib/jobs";
+import { flame, flameGradient } from "../../../lib/flameTheme";
+import { useParams } from "next/navigation";
 
 const columns = [
   {
@@ -17,7 +18,7 @@ const columns = [
   },
   {
     accessorKey: "jobCode", // was "job_code"
-    header: "Job Code",
+    header: "Applicant Name",
     meta: { width: "16%" },
     cell: ({ row }) => (
       <span className="font-mono text-xs font-semibold text-slate-700">
@@ -26,8 +27,8 @@ const columns = [
     ),
   },
   {
-    accessorKey: "title",
-    header: "Title",
+    accessorKey: "cnic",
+    header: "CNIC",
     meta: { width: "28%" },
     cell: ({ row }) => (
       <Link
@@ -40,43 +41,63 @@ const columns = [
   },
   {
     accessorKey: "deadline_formatted",
-    header: "Deadline",
+    header: "Applied On",
     meta: { width: "14%" },
     cell: ({ row }) => (
       <span className="text-slate-600">{row.original.deadline_formatted}</span>
     ),
   },
   {
-    id: "actions",
-    header: "Actions",
+    accessorKey: "deadline_formatted",
+    header: "CV",
     meta: { width: "14%" },
-    enableSorting: false,
     cell: ({ row }) => (
-      <div className="flex items-center gap-2">
-        <Link
-          href={`/jobs/${row.original.id}`}
-          className="rounded-md border border-[#1C6FD9]/30 bg-[#1C6FD9]/5 px-2.5 py-1 text-xs font-semibold text-[#1C6FD9] transition hover:bg-[#1C6FD9] hover:text-white"
-        >
-          View
-        </Link>
-        <Link
-          href={`/jobs/${row.original.id}/edit`} // was relative: "jobs/..."
-          className="rounded-md border border-[#F0862E]/40 bg-[#F0862E]/5 px-2.5 py-1 text-xs font-semibold text-[#D96F12] transition hover:bg-[#F0862E] hover:text-white"
-        >
-          Edit
-        </Link>
-         <Link
-          href={`/jobs/${row.original.id}/report`} // was relative: "jobs/..."
-          className="rounded-md border border-[#F0862E]/40 bg-[#F0862E]/5 px-2.5 py-1 text-xs font-semibold text-[#D96F12] transition hover:bg-[#F0862E] hover:text-white"
-        >
-          Report
-        </Link>
-      </div>
+      <span className="text-slate-600">{row.original.deadline_formatted}</span>
     ),
   },
+  {
+    accessorKey: "deadline_formatted",
+    header: "Doc1",
+    meta: { width: "14%" },
+    cell: ({ row }) => (
+      <span className="text-slate-600">{row.original.deadline_formatted}</span>
+    ),
+  },
+  {
+    accessorKey: "deadline_formatted",
+    header: "Doc2",
+    meta: { width: "14%" },
+    cell: ({ row }) => (
+      <span className="text-slate-600">{row.original.deadline_formatted}</span>
+    ),
+  },
+  //   {
+  //     id: "actions",
+  //     header: "Actions",
+  //     meta: { width: "14%" },
+  //     enableSorting: false,
+  //     cell: ({ row }) => (
+  //       <div className="flex items-center gap-2">
+  //         <Link
+  //           href={`/jobs/${row.original.id}`}
+  //           className="rounded-md border border-[#1C6FD9]/30 bg-[#1C6FD9]/5 px-2.5 py-1 text-xs font-semibold text-[#1C6FD9] transition hover:bg-[#1C6FD9] hover:text-white"
+  //         >
+  //           View
+  //         </Link>
+  //         <Link
+  //           href={`/jobs/${row.original.id}/edit`} // was relative: "jobs/..."
+  //           className="rounded-md border border-[#F0862E]/40 bg-[#F0862E]/5 px-2.5 py-1 text-xs font-semibold text-[#D96F12] transition hover:bg-[#F0862E] hover:text-white"
+  //         >
+  //           Edit
+  //         </Link>
+  //       </div>
+  //     ),
+  //   },
 ];
 
 export default function JobsList() {
+  const { id } = useParams<{ id: string }>();
+
   return (
     <main
       className="min-h-screen px-4 py-10"
@@ -118,11 +139,12 @@ export default function JobsList() {
           <div className="overflow-x-auto p-6">
             <DataTable
               columns={columns}
-              fetchData={getJobs}
+              fetchData={getReport}
               queryKey="jobs"
               pageSize={10}
               searchPlaceholder="Search jobs.."
               showExportButtons={false}
+              id={id}
             />
           </div>
         </div>
