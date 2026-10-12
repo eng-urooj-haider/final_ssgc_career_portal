@@ -98,6 +98,7 @@ model Profile {
 model Job {
   id      Int    @id @default(autoincrement())
   jobCode String @unique @map("job_code") @db.VarChar(50)
+  uuid    String? @unique @default(uuid()) @db.VarChar(36)
 
   title               String   @db.VarChar(250)
   cities              Json // array of city names, e.g. ["Karachi", "Lahore"]
@@ -314,8 +315,8 @@ model JobApplication {
   user                   User     @relation(fields: [userId], references: [id])
   jobId                  Int
   job                    Job      @relation(fields: [jobId], references: [id])
-  selectedExperienceIds  Json     @default("[]")
-  selectedCertificateIds Json     @default("[]")
+  selectedExperienceIds  Json?     @default("[]")
+  selectedCertificateIds Json?     @default("[]")
   doc1Path               String?
   doc2Path               String?
   cv                     String?

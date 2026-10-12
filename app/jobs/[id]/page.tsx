@@ -227,15 +227,16 @@ function DocLink({ title, href }: { title: string; href: string }) {
 
 export default function JobDetailsPage() {
   const params = useParams();
-  const id = params.id as string;
+  const uuid = params.id as string;
 
   const {
     data: apiData,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["job", id],
-    queryFn: () => getJob(id),
+    queryKey: ["job", uuid],
+    queryFn: () => getJob(uuid),
+    retry: false,
   });
 
   if (isLoading) {

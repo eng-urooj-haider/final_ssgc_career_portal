@@ -11,7 +11,7 @@ interface FetchReportParams {
   pageIndex: number;
   pageSize: number;
   search: string;
-  id:number;
+  uuid:string;
 }
 
 interface JobsResponse {
@@ -56,6 +56,7 @@ export const getReport = async ({
       id,
     },
   });
+  if (response.status === 404) throw new Error("NOT_FOUND");
   return response.data;
 };
 
@@ -97,9 +98,9 @@ export const updateJob = async (
   });
   return response.data;
 };
-export const getJob = async (id: string): Promise<JobsResponse> => {
-  const response = await axios.get(`/api/jobs/${id}`);
-  return response.data;
+export const getJob = async (uuid: string): Promise<JobsResponse> => {
+  const response = await axios.get(`/api/jobs/${uuid}`);
+  return response.data.data;
 };
 
 interface JobResponse {

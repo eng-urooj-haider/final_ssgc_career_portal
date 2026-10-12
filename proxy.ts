@@ -1,31 +1,36 @@
 // middleware.ts
 import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "./app/lib/auth";
 
 // Pages that need a logged-in user (adjust to your app)
-const PROTECTED = ["/profile", "/dashboard", "/apply", "/jobs/apply", "/user"];
-
+const PROTECTED = ["/profile", "/dashboard", "/jobs", "/user"];
+function getRole(token?: string): string | null {
+  if (!token) return null;
+  try {
+    return verifyToken(token).role ?? "USER";
+  } catch {
+    return null; // invalid or expired
+  }
+}
 export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
-  console.log("pathname, search", pathname, search);
   const token = req.cookies.get("token")?.value;
-
+  const role = getRole(token);
   const isProtected = PROTECTED.some(
     (p) => pathname === p || pathname.startsWith(p + "/"),
   );
   if ((pathname === "/login" || pathname === "/register") && token) {
-    return NextResponse.redirect(new URL("/", req.url));
+    if (role == "ADMIN") {
+      return NextResponse.redirect(new URL("/jobs", req.url));
+    } else {
+      return NextResponse.redirect(new URL("/user/dashboard", req.url));
+    }
   }
   if (isProtected && !token) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("redirect", pathname + search); // return here after login
     return NextResponse.redirect(loginUrl);
   }
-
-  // Logged-in users don't need the login page
-  if (pathname === "/login" && token) {
-    return NextResponse.redirect(new URL("/", req.url));
-  }
-
   return NextResponse.next();
 }
 
@@ -35,7 +40,7 @@ export const config = {
     "/profile/:path*",
     "/dashboard/:path*",
     "/apply/:path*",
-    "/jobs/apply/:path*",
+    "/jobs/:path*",
     "/login",
     "/user/:path*",
   ],

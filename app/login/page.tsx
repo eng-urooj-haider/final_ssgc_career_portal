@@ -27,7 +27,7 @@ type FormErrors = Partial<Record<keyof LoginFormData, string>>;
 type Touched = Partial<Record<keyof LoginFormData, boolean>>;
 
 const LoginUser = async (credential: LoginFormData): Promise<LoginResponse> => {
-  const response = await axios.post<LoginResponse>("/api/login", credential, {
+  const response = await axios.post<LoginResponse>("/api/auth/login", credential, {
     withCredentials: true,
   });
   return response.data;

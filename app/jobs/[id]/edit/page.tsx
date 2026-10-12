@@ -11,24 +11,25 @@ export default function EditJobPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const params = useParams();
-  const id = params.id as string;
+  const uuid = params.id as string;
 
   const {
     data: apiData,
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["job", id],
-    queryFn: () => getJob(id),
+    queryKey: ["job", uuid],
+    queryFn: () => getJob(uuid),
     staleTime: 0, // always load fresh values when opening the edit form
+    retry: false,
   });
 
   const mutation = useMutation({
-    mutationFn: (data: JobFormData) => updateJob(id, data),
+    mutationFn: (data: JobFormData) => updateJob(uuid, data),
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["job", id] }),
+        queryClient.invalidateQueries({ queryKey: ["job", uuid] }),
       ]);
       router.push("/jobs");
     },

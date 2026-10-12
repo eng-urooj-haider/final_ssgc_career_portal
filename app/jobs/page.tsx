@@ -6,6 +6,7 @@ import { Briefcase, Plus } from "lucide-react";
 import DataTable from "../components/ui/DataTable";
 import { getJobs } from "../lib/jobs";
 import { flame, flameGradient } from "../lib/flameTheme";
+import LogoutButton from "../components/LogoutButton";
 
 const columns = [
   {
@@ -54,19 +55,19 @@ const columns = [
     cell: ({ row }) => (
       <div className="flex items-center gap-2">
         <Link
-          href={`/jobs/${row.original.id}`}
+          href={`/jobs/${row.original.uuid}`}
           className="rounded-md border border-[#1C6FD9]/30 bg-[#1C6FD9]/5 px-2.5 py-1 text-xs font-semibold text-[#1C6FD9] transition hover:bg-[#1C6FD9] hover:text-white"
         >
           View
         </Link>
         <Link
-          href={`/jobs/${row.original.id}/edit`} // was relative: "jobs/..."
+          href={`/jobs/${row.original.uuid}/edit`} // was relative: "jobs/..."
           className="rounded-md border border-[#F0862E]/40 bg-[#F0862E]/5 px-2.5 py-1 text-xs font-semibold text-[#D96F12] transition hover:bg-[#F0862E] hover:text-white"
         >
           Edit
         </Link>
-         <Link
-          href={`/jobs/${row.original.id}/report`} // was relative: "jobs/..."
+        <Link
+          href={`/jobs/${row.original.uuid}/report`} // was relative: "jobs/..."
           className="rounded-md border border-[#F0862E]/40 bg-[#F0862E]/5 px-2.5 py-1 text-xs font-semibold text-[#D96F12] transition hover:bg-[#F0862E] hover:text-white"
         >
           Report
@@ -96,14 +97,17 @@ export default function JobsList() {
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-slate-500">View and manage all jobs.</p>
 
-          <Link
-            href="/jobs/create"
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto"
-            style={{ background: flameGradient }}
-          >
-            <Plus className="h-4 w-4" />
-            Add New Job
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/jobs/create"
+              className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              style={{ background: flameGradient }}
+            >
+              <Plus className="h-4 w-4" />
+              Add New Job
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
 
         {/* Table card (unchanged) */}

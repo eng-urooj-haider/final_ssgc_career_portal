@@ -11,7 +11,7 @@ import {
   globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
-  columnVisibilityFeature,   // ← add this import
+  columnVisibilityFeature, // ← add this import
   createFilteredRowModel,
   createSortedRowModel,
   createPaginatedRowModel,
@@ -23,7 +23,7 @@ const features = tableFeatures({
   globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
-  columnVisibilityFeature,   // ← add this here too
+  columnVisibilityFeature, // ← add this here too
   filteredRowModel: createFilteredRowModel(),
   sortedRowModel: createSortedRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
@@ -37,7 +37,7 @@ const DataTable = ({
   searchPlaceholder = "Search…",
   showExportButtons = false,
   id = null,
-  status,
+  // status,
 }) => {
   const [sorting, setSorting] = useState([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -61,25 +61,29 @@ const DataTable = ({
     isFetching,
     isError,
     error,
+    isPending,
   } = useQuery({
-    queryKey: [queryKey, pagination, debouncedSearch, status],
+    queryKey: [queryKey, pagination, debouncedSearch],
     queryFn: () => {
-      const skipLoader = isSearchAction.current;
-      isSearchAction.current = false;
+      // const skipLoader = isSearchAction.current;
+      // isSearchAction.current = false;
       return fetchData({
-        id,
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         search: debouncedSearch,
-        skipLoader,
-        status,
+        id,
+        // skipLoader,
+        // status,
       });
     },
-    placeholderData: keepPreviousData,
-    staleTime: 30000,
+    // placeholderData: keepPreviousData,
+    // staleTime: 30000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
   const data = apiData?.data ?? [];
+  console.log("dataaaaa", data[0]?.user?.profile);
   const totalRows = apiData?.total ?? 0;
   const from = apiData?.from ?? 0;
   const to = apiData?.to ?? 0;
@@ -100,53 +104,6 @@ const DataTable = ({
 
   const rows = table.getRowModel().rows;
   const pageIndex = pagination.pageIndex;
-
-  // const handleExportExcel = () => {
-  //   const exportRows = table.getFilteredRowModel().rows;
-  //   const exportData = exportRows.map((row) => {
-  //     const rowData = {};
-  //     row.getVisibleCells().forEach((cell) => {
-  //       if (cell.column.id === "actions") return;
-  //       const header = cell.column.columnDef.header;
-  //       rowData[header] = cell.getValue();
-  //     });
-  //     return rowData;
-  //   });
-
-  //   const worksheet = XLSX.utils.json_to_sheet(exportData);
-  //   const workbook = XLSX.utils.book_new();
-  //   XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
-  //   XLSX.writeFile(workbook, "export.xlsx");
-  // };
-
-  // const handleExportPdf = () => {
-  //   const doc = new jsPDF();
-  //   doc.setFontSize(14);
-  //   doc.text("E-Kachehri", 14, 15);
-
-  //   const exportRows = table.getFilteredRowModel().rows;
-  //   const tableData = exportRows.map((row) =>
-  //     row
-  //       .getVisibleCells()
-  //       .filter((cell) => cell.column.id !== "actions")
-  //       .map((cell) => String(cell.getValue() ?? "")),
-  //   );
-  //   const tableHeaders = table
-  //     .getHeaderGroups()[0]
-  //     .headers.filter((h) => h.column.id !== "actions")
-  //     .map((h) => h.column.columnDef.header);
-
-  //   autoTable(doc, {
-  //     head: [tableHeaders],
-  //     body: tableData,
-  //     startY: 22,
-  //     styles: { fontSize: 9 },
-  //     headStyles: { fillColor: [245, 130, 31] },
-  //   });
-
-  //   doc.save("ekachehri-report.pdf");
-  // };
-
   return (
     <div className="relative w-full min-w-0 overflow-x-auto overflow-y-visible rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
       {/* Toolbar */}
@@ -213,7 +170,10 @@ const DataTable = ({
           </colgroup>
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-gray-100 bg-gray-50/60">
+              <tr
+                key={headerGroup.id}
+                className="border-b border-gray-100 bg-gray-50/60"
+              >
                 {headerGroup.headers.map((header) => {
                   const sortDir = header.column.getIsSorted();
                   const canSort = header.column.getCanSort();
@@ -228,13 +188,28 @@ const DataTable = ({
                       }`}
                     >
                       <span className="inline-flex items-center gap-1.5">
-                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
                         {canSort && (
                           <span className="flex flex-col leading-none text-[8px]">
-                            <span className={sortDir === "asc" ? "text-[#F5821F]" : "text-gray-300"}>
+                            <span
+                              className={
+                                sortDir === "asc"
+                                  ? "text-[#F5821F]"
+                                  : "text-gray-300"
+                              }
+                            >
                               ▲
                             </span>
-                            <span className={sortDir === "desc" ? "text-[#F5821F]" : "text-gray-300"}>
+                            <span
+                              className={
+                                sortDir === "desc"
+                                  ? "text-[#F5821F]"
+                                  : "text-gray-300"
+                              }
+                            >
                               ▼
                             </span>
                           </span>
@@ -248,31 +223,58 @@ const DataTable = ({
           </thead>
 
           <tbody>
+            {isPending &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={`skeleton-${i}`} className="border-b border-gray-100">
+                  {columns.map((col, j) => (
+                    <td
+                      key={col.id ?? col.accessorKey ?? j}
+                      className="px-4 py-3"
+                    >
+                      <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+
             {isError && (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-sm text-red-500">
-                  Failed to load data{error?.message ? `: ${error.message}` : "."}
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-10 text-center text-sm text-red-500"
+                >
+                  Failed to load data,job not found
                 </td>
               </tr>
             )}
 
-            {!isError && rows.length === 0 && (
+            {!isPending && !isError && rows.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-sm text-gray-500">
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-10 text-center text-sm text-gray-500"
+                >
                   No results found.
                 </td>
               </tr>
             )}
 
-            {!isError &&
+            {!isPending &&
+              !isError &&
               rows.map((row) => (
                 <tr
                   key={row.id}
                   className="border-b border-gray-100 transition-colors duration-150 hover:bg-gray-50"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-sm font-medium text-gray-700">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    <td
+                      key={cell.id}
+                      className="px-4 py-3 text-sm font-medium text-gray-700"
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -284,7 +286,9 @@ const DataTable = ({
       {/* Pagination footer */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-3.5">
         <span className="text-xs text-gray-500">
-          {totalRows === 0 ? "0 results" : `Showing ${from}–${to} of ${totalRows}`}
+          {totalRows === 0
+            ? "0 results"
+            : `Showing ${from}–${to} of ${totalRows}`}
           {isFetching && " · Updating…"}
         </span>
 
@@ -307,7 +311,9 @@ const DataTable = ({
           </button>
 
           <span className="px-2 text-xs text-gray-500 whitespace-nowrap">
-            Page <span className="font-semibold text-gray-800">{pageIndex + 1}</span> of{" "}
+            Page{" "}
+            <span className="font-semibold text-gray-800">{pageIndex + 1}</span>{" "}
+            of{" "}
             <span className="font-semibold text-gray-800">
               {resolvedPageCount > 0 ? resolvedPageCount : 1}
             </span>

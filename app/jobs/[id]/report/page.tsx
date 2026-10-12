@@ -2,12 +2,12 @@
 "use client";
 
 import Link from "next/link";
-import { Briefcase, Plus } from "lucide-react";
+import { Briefcase, Plus, FileText, Paperclip, ArrowLeft } from "lucide-react";
 import DataTable from "@/app/components/ui/DataTable";
-import { getJobs, getReport } from "../../../lib/jobs";
+import { getJob, getJobs, getReport } from "../../../lib/jobs";
 import { flame, flameGradient } from "../../../lib/flameTheme";
 import { useParams } from "next/navigation";
-
+import { useQuery } from "@tanstack/react-query";
 const columns = [
   {
     id: "index",
@@ -17,93 +17,135 @@ const columns = [
     cell: ({ row }) => <div className="text-slate-500">{row.index + 1}</div>,
   },
   {
-    accessorKey: "jobCode", // was "job_code"
+    accessorKey: "firstName", // was "job_code"
     header: "Applicant Name",
     meta: { width: "16%" },
     cell: ({ row }) => (
       <span className="font-mono text-xs font-semibold text-slate-700">
-        {row.original.jobCode}
+        {row.original.firstName} {row.original.lastName}
       </span>
     ),
   },
   {
-    accessorKey: "cnic",
+    accessorKey: "cnic", // was "job_code"
     header: "CNIC",
-    meta: { width: "28%" },
+    meta: { width: "16%" },
     cell: ({ row }) => (
-      <Link
-        href={`/jobs/${row.original.id}`}
-        className="font-semibold text-[#1C6FD9] transition-colors hover:text-[#F0862E] hover:underline"
-      >
-        {row.original.title}
-      </Link>
+      <span className="font-mono text-xs font-semibold text-slate-700">
+        {row.original.cnic}
+      </span>
     ),
   },
   {
-    accessorKey: "deadline_formatted",
+    accessorKey: "createdAt",
     header: "Applied On",
     meta: { width: "14%" },
     cell: ({ row }) => (
-      <span className="text-slate-600">{row.original.deadline_formatted}</span>
+      <span className="text-slate-600">{row.original.createdAt}</span>
     ),
   },
   {
-    accessorKey: "deadline_formatted",
-    header: "CV",
+    accessorKey: "cv",
+    header: "Resume",
     meta: { width: "14%" },
-    cell: ({ row }) => (
-      <span className="text-slate-600">{row.original.deadline_formatted}</span>
-    ),
+    cell: ({ row }) => {
+      const cv = row.original.cv;
+
+      if (!cv) return <span className="text-slate-400">-</span>;
+
+      return (
+        <a
+          href={cv}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View resume"
+          aria-label="View resume (PDF)"
+          className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-600 hover:text-white"
+        >
+          <FileText className="h-4 w-4" />
+          PDF
+        </a>
+      );
+    },
   },
   {
-    accessorKey: "deadline_formatted",
+    accessorKey: "doc1",
     header: "Doc1",
     meta: { width: "14%" },
-    cell: ({ row }) => (
-      <span className="text-slate-600">{row.original.deadline_formatted}</span>
-    ),
+    cell: ({ row }) => {
+      const doc1 = row.original.doc1;
+
+      if (!doc1) return <span className="text-slate-400">-</span>;
+
+      return (
+        <a
+          href={doc1}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View resume"
+          aria-label="View resume (PDF)"
+          className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-600 hover:text-white"
+        >
+          <Paperclip className="h-4 w-4" />
+          Doc1
+        </a>
+      );
+    },
   },
   {
-    accessorKey: "deadline_formatted",
+    accessorKey: "doc2",
     header: "Doc2",
     meta: { width: "14%" },
-    cell: ({ row }) => (
-      <span className="text-slate-600">{row.original.deadline_formatted}</span>
-    ),
-  },
-  //   {
-  //     id: "actions",
-  //     header: "Actions",
-  //     meta: { width: "14%" },
-  //     enableSorting: false,
-  //     cell: ({ row }) => (
-  //       <div className="flex items-center gap-2">
-  //         <Link
-  //           href={`/jobs/${row.original.id}`}
-  //           className="rounded-md border border-[#1C6FD9]/30 bg-[#1C6FD9]/5 px-2.5 py-1 text-xs font-semibold text-[#1C6FD9] transition hover:bg-[#1C6FD9] hover:text-white"
-  //         >
-  //           View
-  //         </Link>
-  //         <Link
-  //           href={`/jobs/${row.original.id}/edit`} // was relative: "jobs/..."
-  //           className="rounded-md border border-[#F0862E]/40 bg-[#F0862E]/5 px-2.5 py-1 text-xs font-semibold text-[#D96F12] transition hover:bg-[#F0862E] hover:text-white"
-  //         >
-  //           Edit
-  //         </Link>
-  //       </div>
-  //     ),
-  //   },
-];
+    cell: ({ row }) => {
+      const doc2 = row.original.doc2;
 
+      if (!doc2) return <span className="text-slate-400">-</span>;
+
+      return (
+        <a
+          href={doc2}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View resume"
+          aria-label="View resume (PDF)"
+          className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-600 hover:text-white"
+        >
+          <Paperclip className="h-4 w-4" />
+          Doc2
+        </a>
+      );
+    },
+  },
+];
+function BackLink() {
+  return (
+    <Link
+      href="/jobs"
+      className="mb-5 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      Back to jobs
+    </Link>
+  );
+}
 export default function JobsList() {
   const { id } = useParams<{ id: string }>();
-
+  const { data, isPending, isError, error } = useQuery({
+    queryKey: ["job", id],
+    queryFn: () => getJob(id),
+    enabled: !!id, // don't run until id exists
+    retry: (count, err) => err.message !== "NOT_FOUND" && count < 1,
+    refetchOnWindowFocus: false,
+  });
+  const jobCode = data?.jobCode
   return (
     <main
       className="min-h-screen px-4 py-10"
       style={{ background: flame.paper }}
     >
       <div className="mx-auto max-w-6xl">
+        <BackLink />
+
         {/* Logo */}
         <div className="mb-4">
           <img
@@ -136,11 +178,14 @@ export default function JobsList() {
           }}
         >
           <div className="h-1" style={{ background: flameGradient }} />
+          {jobCode && (<h1 className="text-center mt-2 text-slate-500 text-3xl ">
+            Report for Job Code {jobCode}
+          </h1>)}
           <div className="overflow-x-auto p-6">
             <DataTable
               columns={columns}
               fetchData={getReport}
-              queryKey="jobs"
+              queryKey="report"
               pageSize={10}
               searchPlaceholder="Search jobs.."
               showExportButtons={false}

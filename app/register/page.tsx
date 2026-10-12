@@ -40,7 +40,7 @@ const RegisterUser = async (
   // Don't send confirmedPassword to the API — it's a client-side-only check
   const { confirmedPassword, ...payload } = credential;
   const response = await axios.post<RegisterResponse>(
-    "/api/register",
+    "/api/auth/register",
     payload,
     { withCredentials: true },
   );

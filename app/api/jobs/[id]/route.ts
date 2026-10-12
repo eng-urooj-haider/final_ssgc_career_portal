@@ -82,12 +82,12 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export const GET = async (_req: NextRequest, { params }: Ctx) => {
   try {
-    const jobId = parseId((await params).id);
-    if (!jobId) {
+    const uuid = (await params).id;
+    if (!uuid) {
       return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
     }
 
-    const job = await prisma.job.findUnique({ where: { id: jobId } });
+    const job = await prisma.job.findUnique({ where: { uuid } });
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
