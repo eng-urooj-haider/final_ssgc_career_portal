@@ -2,12 +2,12 @@
 
 import prisma from "@/app/lib/db";
 
-export async function findId(id: string) {
-  const numericId = Number(id);
-  if (!Number.isInteger(numericId)) return null;
+export async function findId(uuid: string) {
+  // const numericId = Number(id);
+  // if (!Number.isInteger(numericId)) return null;
 
   const row = await prisma.job.findUnique({
-    where: { id: numericId },
+    where: { uuid: uuid },
     include: { profileCompletion: true },
   });
 

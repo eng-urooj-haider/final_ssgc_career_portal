@@ -4,7 +4,7 @@ export const flame = {
   edge: "#F0862E",
   tip: "#FBB03B",
   ink: "#0B1F33",
-  paper: "#FAFAF8",
+  paper: "#FFF9F0",
 };
 
 export const flameGradient = `linear-gradient(90deg, ${flame.core} 0%, ${flame.mid} 45%, ${flame.edge} 78%, ${flame.tip} 100%)`;

@@ -6,6 +6,7 @@ import axios, { AxiosError } from "axios";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { getSafeRedirect, redirectQuery } from "../lib/redirect";
+import { GradientButton } from "../components/GradientButton";
 
 interface LoginFormData {
   email: string;
@@ -27,9 +28,13 @@ type FormErrors = Partial<Record<keyof LoginFormData, string>>;
 type Touched = Partial<Record<keyof LoginFormData, boolean>>;
 
 const LoginUser = async (credential: LoginFormData): Promise<LoginResponse> => {
-  const response = await axios.post<LoginResponse>("/api/auth/login", credential, {
-    withCredentials: true,
-  });
+  const response = await axios.post<LoginResponse>(
+    "/api/auth/login",
+    credential,
+    {
+      withCredentials: true,
+    },
+  );
   return response.data;
 };
 
@@ -163,16 +168,15 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="rounded-2xl bg-white p-8 shadow-lg">
           {/* Header */}
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#F5A623] text-lg font-bold text-white shadow-md">
+          <div className="mb-8 text-center flex items-center justify-center">
+            {/* <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#F5A623] text-lg font-bold text-white shadow-md">
               SSGC
-            </div>
-
-            <h1 className="text-2xl font-bold text-[#333333]">Welcome Back</h1>
-
-            <p className="mt-2 text-sm text-gray-500">
-              Login to your SSGC Careers Portal account
-            </p>
+            </div> */}
+            <img
+              src="/assests/logo-full.png"
+              className="h-20 w-auto"
+              alt="SSGC logo"
+            />
           </div>
 
           {/* API Error Message */}
@@ -256,13 +260,20 @@ export default function LoginPage() {
             </div>
 
             {/* Login Button */}
-            <button
+            {/* <button
               type="submit"
               disabled={LoginMutation.isPending}
               className="w-full rounded-lg bg-[#F5A623] px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-[#D88900] focus:outline-none focus:ring-4 focus:ring-[#F5A623]/20 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {LoginMutation.isPending ? "Logging in..." : "Login"}
-            </button>
+            </button> */}
+            <GradientButton
+              type="submit"
+              disabled={LoginMutation.isPending}
+              className="w-full !rounded-lg !px-6 !py-3 !font-semibold"
+            >
+              {LoginMutation.isPending ? "Logging in..." : "Login"}
+            </GradientButton>
           </form>
 
           {/* Register */}

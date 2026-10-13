@@ -106,14 +106,16 @@ export const GET = async (_req: NextRequest, { params }: Ctx) => {
 export const PUT = async (req: NextRequest, { params }: Ctx) => {
   const newFiles: string[] = []; // written during this request (rollback on failure)
   try {
-    // TODO: check session / role here and return 401/403
+    // const jobId = parseId((await params).id);
+    const jobId = (await params).id;
+    console.log('jobId' , jobId)
 
-    const jobId = parseId((await params).id);
     if (!jobId) {
+      console.log("stop here")
       return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
     }
 
-    const existingJob = await prisma.job.findUnique({ where: { id: jobId } });
+    const existingJob = await prisma.job.findUnique({ where: { uuid: jobId } });
     if (!existingJob) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
@@ -286,7 +288,7 @@ export const PUT = async (req: NextRequest, { params }: Ctx) => {
 
     /* ---- update ---- */
     const job = await prisma.job.update({
-      where: { id: jobId },
+      where: { uuid: jobId },
       data: {
         jobCode,
         title,

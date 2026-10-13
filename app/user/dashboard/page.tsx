@@ -33,6 +33,8 @@ import useUserProfile from "@/app/lib/fetchUserProfile";
 import { useSearchParams } from "next/navigation";
 import { findId } from "@/app/action/job";
 import { ProgressBar } from "@/app/components/ProgressBar";
+import { flame } from "../../lib/flameTheme";
+
 
 type TabId =
   | "photo"
@@ -47,15 +49,6 @@ interface TabDef {
   label: string;
   icon: LucideIcon;
 }
-
-const flame = {
-  core: "#1C6FD9",
-  mid: "#2E8FD6",
-  edge: "#F0862E",
-  tip: "#FBB03B",
-  ink: "#0B1F33",
-  paper: "#FAFAF8",
-};
 
 const flameGradient = `linear-gradient(90deg, ${flame.core} 0%, ${flame.mid} 45%, ${flame.edge} 78%, ${flame.tip} 100%)`;
 
@@ -378,7 +371,7 @@ function PhotoTab({ image, onChange, error, canAdd = true }: PhotoTabProps) {
     <div>
       <SectionHeading
         title="Profile photo"
-        description="A clear, recent photo helps recruiters recognise you at interview."
+        description="Upload a clear, recent photo"
       />
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-6">
@@ -423,7 +416,7 @@ function PhotoTab({ image, onChange, error, canAdd = true }: PhotoTabProps) {
             )}
             {canAdd && (
               <p className="mt-2 text-xs text-slate-500">
-                JPG or PNG. Square image, at least 400×400px.
+                JPG or PNG , at least 400×400px.
               </p>
             )}
 
@@ -621,7 +614,7 @@ function PersonalTab({
           </Field>
         )}
 
-        <Field label="Passport Number" required error={errors.passport_no}>
+        <Field label="Passport Number"  error={errors.passport_no}>
           <FlameInput
             name="passport_no"
             value={formData.passport_no || ""}
@@ -1632,7 +1625,7 @@ export function CertificatesTab({
                     />
                   </label>
 
-                  {(entry.document &&  canAdd) && (
+                  {entry.document && canAdd && (
                     <button
                       type="button"
                       onClick={() => onFieldChange(entry.id, "document", null)}
@@ -1818,6 +1811,8 @@ const initialFormData: ProfileFormData = {
 };
 import { useMemo } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
+import LogoutButton from "@/app/components/LogoutButton";
 
 export function calculateProfileProgress(job, profile) {
   // Return 0 if either object is missing
@@ -1910,7 +1905,10 @@ export default function ProfileTabs() {
     const newErrors: Record<string, string> = {};
 
     if (activeTab === "photo") {
-      if (!(formData.image instanceof File) && !formData.image) {
+      const hasNewFile = formData.image instanceof File;
+      const hasSavedPhoto = Boolean(profile?.userPic);
+
+      if (!hasNewFile && !hasSavedPhoto) {
         newErrors.image = "Image is required";
       }
     }
@@ -2372,15 +2370,20 @@ export default function ProfileTabs() {
 
     setSaving(true);
     setSubmitError(null);
-
+    const SECTION_LABELS: Record<string, string> = {
+      photo: "Profile photo",
+      personal: "Personal information",
+      experience: "Work experience",
+      education: "Education",
+      certificates: "Certificates",
+      memberships: "Memberships",
+    };
+    const label = SECTION_LABELS[activeTab] ?? "Profile";
     try {
       switch (activeTab) {
         case "photo": {
           if (!(formData.image instanceof File)) {
-            setErrors((prev) => ({
-              ...prev,
-              image: "Please select a photo first",
-            }));
+            toast.warning("No changes to save");
             return;
           }
           const photoPayload = new FormData();
@@ -2464,8 +2467,9 @@ export default function ProfileTabs() {
           break;
       }
       await QueryClient.invalidateQueries({ queryKey: ["profile_data"] });
-      alert("Saved successfully!");
+      toast.success(`${label} saved successfully`);
     } catch (err) {
+      toast.error(`Could not save ${label.toLowerCase()}`);
       console.error("Submission failed", err);
       setSubmitError("Something went wrong while saving");
     } finally {
@@ -2499,11 +2503,11 @@ export default function ProfileTabs() {
             check the link and try again.
           </p>
           <a
-            href="/profile"
+            href="/"
             className="inline-block px-5 py-2.5 rounded-md text-white text-sm font-medium transition-opacity hover:opacity-90"
             style={{ background: flameGradient }}
           >
-            Go to General Profile
+            Go to jobs
           </a>
         </div>
       </div>
@@ -2526,18 +2530,11 @@ export default function ProfileTabs() {
       className="min-h-screen py-10 px-4"
       style={{ background: flame.paper }}
     >
-      <div className="mb-6 flex items-center gap-3">
-        <div
-          className="w-52 h-10 rounded-lg flex items-center justify-center shrink-0"
-          //   style={{ background: flameGradient }}
-        >
-          {/* <Flame
-            className="w-5 h-5 text-white"
-            fill="white"
-            fillOpacity={0.25}
-          /> */}
-          <img src="/assests/logo-full.png" alt="" />
-        </div>
+      <div className="mb-6 flex items-center justify-around gap-3">
+        {/* <div className="w-52 h-10 rounded-lg flex items-center justify-between shrink-0"> */}
+          <img src="/assests/logo-full.png" alt=""  className="w-auto h-12"/>
+          <LogoutButton />
+        {/* </div> */}
         {/* <div>
           <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
             Candidate profile

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import JobForm, { JobFormData } from "../../../components/jobs/JobForm";
 import JobPageShell from "../../../components/jobs/JobPageShell";
 import { updateJob, getJob } from "../../../lib/jobs";
+import { toast } from "sonner";
 
 export default function EditJobPage() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function EditJobPage() {
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["job", uuid] }),
       ]);
+       toast.success("Job updated successfully");
       router.push("/jobs");
     },
   });

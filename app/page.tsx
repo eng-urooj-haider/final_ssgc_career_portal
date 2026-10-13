@@ -19,9 +19,9 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-// Regenerate at most once per hour. See the note below about on-demand
-// revalidation so new jobs appear immediately after saving.
-export const revalidate = 3600;
+// Cached page. Also call revalidatePath("/") after creating, updating or
+// deleting a job so changes show up immediately.
+export const revalidate = 600;
 
 export const metadata: Metadata = {
   title: "Careers at SSGC",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 };
 
 /* -------------------------------------------------------------------------- */
-/*  Data                                                                       */
+/*  Constants & data                                                           */
 /* -------------------------------------------------------------------------- */
 
 const HOUR = 60 * 60 * 1000;
@@ -38,6 +38,11 @@ const DAY = 24 * HOUR;
 // `deadline` is a date-only value stored as UTC midnight. A job stays open
 // until the end of that day in Pakistan (UTC+5, no DST) = 19:00 UTC.
 const CLOSE_OFFSET_MS = 19 * HOUR;
+
+// Shared by the header and every job card (was previously defined inside
+// JobPosting only, which crashed the header)
+const buttonClass =
+  "inline-flex items-center rounded-md px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90";
 
 async function getJobs() {
   const now = new Date();
@@ -49,10 +54,19 @@ async function getJobs() {
       where: { ...published, deadline: { gt: cutoff } },
       orderBy: { publicationDate: "desc" },
     }),
+    // The archive table only needs a few columns
     prisma.job.findMany({
       where: { ...published, deadline: { lte: cutoff } },
       orderBy: { deadline: "desc" },
       take: 50,
+      select: {
+        id: true,
+        jobCode: true,
+        title: true,
+        cities: true,
+        publicationDate: true,
+        deadline: true,
+      },
     }),
   ]);
 
@@ -73,8 +87,8 @@ const formatDate = (date: Date) =>
     timeZone: "UTC", // @db.Date is stored as UTC midnight
   });
 
-const getCities = (job: JobRecord): string[] =>
-  Array.isArray(job.cities) ? (job.cities as string[]) : [];
+const toCities = (cities: unknown): string[] =>
+  Array.isArray(cities) ? (cities as string[]) : [];
 
 const daysLeft = (deadline: Date, now: number) =>
   Math.ceil((deadline.getTime() + CLOSE_OFFSET_MS - now) / DAY);
@@ -84,7 +98,7 @@ const applyHref = (job: JobRecord) =>
     ? `mailto:${job.email}?subject=${encodeURIComponent(
         `Application for ${job.title} (${job.jobCode})`,
       )}`
-    : `/user/dashboard?jobId=${job.id}`;
+    : `/user/dashboard?jobId=${job.uuid}`;
 
 /* -------------------------------------------------------------------------- */
 /*  UI pieces                                                                  */
@@ -95,9 +109,7 @@ function DeadlineBadge({ left }: { left: number }) {
   return (
     <span
       className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-        urgent
-          ? "bg-[#F0862E]/15 text-[#FBB03B]"
-          : "bg-white/10 text-white/80"
+        urgent ? "bg-[#F0862E]/15 text-[#FBB03B]" : "bg-white/10 text-white/80"
       }`}
     >
       {left <= 1 ? "Closes today" : `${left} days left`}
@@ -144,6 +156,7 @@ function DocDetail({ title, href }: { title: string | null; href: string }) {
 // Structured data so Google can show the job in job search results.
 // "<" is escaped so the JSON can never break out of the script tag.
 function JobJsonLd({ job }: { job: JobRecord }) {
+  const cities = toCities(job.cities);
   const data = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
@@ -159,14 +172,17 @@ function JobJsonLd({ job }: { job: JobRecord }) {
       "@type": "Organization",
       name: "Sui Southern Gas Company",
     },
-    jobLocation: getCities(job).map((city) => ({
-      "@type": "Place",
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: city,
-        addressCountry: "PK",
-      },
-    })),
+    // Omit the key when there are no cities (an empty array is invalid)
+    ...(cities.length > 0 && {
+      jobLocation: cities.map((city) => ({
+        "@type": "Place",
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: city,
+          addressCountry: "PK",
+        },
+      })),
+    }),
     description: [job.qualification, job.skill, job.responsibility]
       .map(htmlToPlainText)
       .filter(Boolean)
@@ -183,17 +199,15 @@ function JobJsonLd({ job }: { job: JobRecord }) {
 }
 
 function JobPosting({ job, now }: { job: JobRecord; now: number }) {
-  const cities = getCities(job);
+  const cities = toCities(job.cities);
   const special = htmlToPlainText(job.specialInfo);
   const hasDocs = job.doc1Attachment || job.doc2Attachment;
   const left = daysLeft(job.deadline, now);
   const href = applyHref(job);
-  const buttonClass =
-    "inline-flex items-center rounded-md px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90";
 
   return (
     <article
-      id={`job-${job.id}`}
+      id={`job-${job.uuid}`}
       className="mb-8 scroll-mt-6 overflow-hidden rounded-xl bg-white"
       style={{
         border: "1px solid #E7E5E1",
@@ -206,7 +220,9 @@ function JobPosting({ job, now }: { job: JobRecord; now: number }) {
       {/* Job code bar */}
       <div
         className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5"
-        style={{ background: flame.ink }}
+        // style={{ background: flame.ink }}
+            style={{ background: flameGradient }}
+
       >
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium uppercase tracking-wide text-white/60">
@@ -297,11 +313,19 @@ function JobPosting({ job, now }: { job: JobRecord; now: number }) {
 
       <div className="border-t border-[#E7E5E1] px-5 py-5">
         {job.email ? (
-          <a href={href} className={buttonClass} style={{ background: flameGradient }}>
+          <a
+            href={href}
+            className={buttonClass}
+            style={{ background: flameGradient }}
+          >
             Apply by email
           </a>
         ) : (
-          <Link href={href} className={buttonClass} style={{ background: flameGradient }}>
+          <Link
+            href={href}
+            className={buttonClass}
+            style={{ background: flameGradient }}
+          >
             Apply now
           </Link>
         )}
@@ -322,17 +346,17 @@ export default async function CareersPage() {
       className={`${archivo.variable} ${inter.variable} min-h-screen font-[family-name:var(--font-inter)]`}
       style={{ background: flame.paper, color: flame.ink }}
     >
-      <header className="border-b border-[#E7E5E1] bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <div
-            className="font-[family-name:var(--font-archivo)] text-xl font-extrabold tracking-tight"
-            style={{ color: flame.ink }}
-          >
-            SSGC
-          </div>
+      <header className="">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-3">
+          <img
+            src="/assests/logo-full.png"
+            className="block h-12 w-auto sm:h-16"
+            alt="SSGC logo"
+          />
           <Link
             href="/login"
-            className="rounded-md border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:border-[#1C6FD9] hover:text-[#1C6FD9]"
+            className={`${buttonClass} shrink-0 mt-5`}
+            style={{ background: flameGradient }}
           >
             Login
           </Link>
@@ -356,8 +380,7 @@ export default async function CareersPage() {
           current.map((job) => <JobPosting key={job.id} job={job} now={now} />)
         ) : (
           <p className="rounded-xl border border-[#E7E5E1] bg-white px-6 py-10 text-center text-slate-500">
-            There are no new jobs opening at this time. Please check back
-            later.
+            There are no new jobs opening at this time. Please check back later.
           </p>
         )}
 
@@ -376,11 +399,21 @@ export default async function CareersPage() {
                 <caption className="sr-only">Archived job positions</caption>
                 <thead>
                   <tr className="border-b border-[#E7E5E1] bg-[#FBFBFA] text-slate-500">
-                    <th scope="col" className="px-5 py-3 font-semibold">Job code</th>
-                    <th scope="col" className="px-5 py-3 font-semibold">Title</th>
-                    <th scope="col" className="px-5 py-3 font-semibold">Location</th>
-                    <th scope="col" className="px-5 py-3 font-semibold">Published</th>
-                    <th scope="col" className="px-5 py-3 font-semibold">Deadline</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Job code
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Title
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Location
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Published
+                    </th>
+                    <th scope="col" className="px-5 py-3 font-semibold">
+                      Deadline
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -398,7 +431,7 @@ export default async function CareersPage() {
                       </th>
                       <td className="px-5 py-4 text-slate-600">{job.title}</td>
                       <td className="px-5 py-4 text-slate-600">
-                        {getCities(job).join(", ")}
+                        {toCities(job.cities).join(", ")}
                       </td>
                       <td className="px-5 py-4 text-slate-600">
                         {formatDate(job.publicationDate)}

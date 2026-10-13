@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import JobForm, { JobFormData } from "../../components/jobs/JobForm";
 import JobPageShell from "../../components/jobs/JobPageShell";
 import { createJob } from "../../lib/jobs";
+import { toast } from "sonner";
 
 export default function AddNewJobPage() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function AddNewJobPage() {
     mutationFn: createJob,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+       toast.success("Job created successfully");
       router.push("/jobs");
     },
   });
