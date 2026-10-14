@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const EXPIRY_SECONDS = 60 * 30;
+const EXPIRY_SECONDS = 60 * 1;
 
 export function setTokenCookie(response: NextResponse, token: string) {
   response.cookies.set("token", token, {

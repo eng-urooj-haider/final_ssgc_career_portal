@@ -21,7 +21,7 @@ export function createJwtToken(user: JwtUser) {
   const token = jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
     jwtSecret,
-    { expiresIn: "30m" }
+    { expiresIn: "1m" }
   );
   return token;
 }

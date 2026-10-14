@@ -81,13 +81,13 @@ function validateField(
     case "firstName":
       if (!value.trim()) return "First name is required.";
       if (value.trim().length < 2) return "First name is too short.";
-      if (value.trim().length > 25) return "First name is too large.";
+      if (value.trim().length > 30) return "First name is too large.";
       return undefined;
 
     case "lastName":
       if (!value.trim()) return "Last name is required.";
       if (value.trim().length < 2) return "Last name is too short.";
-      if (value.trim().length > 25) return "Last name is too large.";
+      if (value.trim().length > 30) return "Last name is too large.";
 
       return undefined;
 
@@ -214,10 +214,28 @@ export default function Page() {
     RegisterMutation.mutate(formDetail);
   };
 
+  // const apiErrorMessage = RegisterMutation.isError
+  //   ? (RegisterMutation.error.response?.data?.message ??
+  //     "Something went wrong. Please try again.")
+  //   : null;
+  type FieldErrors = Record<string, string[]>;
+
+  const responseData = RegisterMutation.isError
+    ? RegisterMutation.error.response?.data
+    : undefined;
+
+  const fieldErrors: FieldErrors = responseData?.fields ?? {};
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+
+  // Banner shows only when there are NO field errors (network, 409, 500...)
   const apiErrorMessage = RegisterMutation.isError
-    ? (RegisterMutation.error.response?.data?.message ??
-      "Something went wrong. Please try again.")
+    ? hasFieldErrors
+      ? null
+      : (responseData?.message ?? "Something went wrong. Please try again.")
     : null;
+
+  // First message for a field, or undefined
+  const fieldError = (name: string) => fieldErrors[name]?.[0];
 
   const fieldClass = (hasError?: string) =>
     `w-full rounded-lg border px-4 py-3 text-sm text-black outline-none transition focus:ring-2 disabled:bg-gray-100 ${
@@ -245,9 +263,22 @@ export default function Page() {
           </div>
 
           {/* Error Message */}
-          {apiErrorMessage && (
+          {/* {apiErrorMessage && (
             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {apiErrorMessage}
+            </div>
+          )} */}
+          {(apiErrorMessage || hasFieldErrors) && (
+            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+              {hasFieldErrors ? (
+                <ul className="list-disc pl-4">
+                  {Object.entries(fieldErrors).flatMap(([field, msgs]) =>
+                    msgs.map((m) => <li key={field + m}>{m}</li>),
+                  )}
+                </ul>
+              ) : (
+                apiErrorMessage
+              )}
             </div>
           )}
 

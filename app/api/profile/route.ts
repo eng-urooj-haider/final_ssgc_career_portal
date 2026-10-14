@@ -15,7 +15,15 @@ function parseSafeBoolean(value: unknown): boolean {
   }
   return false;
 }
-
+function getUserId(req: NextRequest): number | null {
+  const token = req.cookies.get("token")?.value;
+  if (!token) return null;
+  try {
+    return verifyToken(token).userId ?? null;
+  } catch {
+    return null; // expired or invalid
+  }
+}
 function parseFlexibleDate(value: unknown): Date | null {
   if (!value || typeof value !== "string" || !value.trim()) return null;
   const direct = new Date(value);
@@ -28,10 +36,7 @@ function parseFlexibleDate(value: unknown): Date | null {
 }
 
 export async function PATCH(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
-  const decode = await verifyToken(token);
-  const userId = decode?.userId;
-
+  const userId = getUserId(req);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

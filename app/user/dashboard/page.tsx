@@ -19,7 +19,6 @@ import {
   Flame,
   type LucideIcon,
 } from "lucide-react";
-import axios from "axios";
 import {
   GetCities,
   GetCountries,
@@ -34,7 +33,7 @@ import { useSearchParams } from "next/navigation";
 import { findId } from "@/app/action/job";
 import { ProgressBar } from "@/app/components/ProgressBar";
 import { flame } from "../../lib/flameTheme";
-
+import api from "../../lib/api";
 
 type TabId =
   | "photo"
@@ -337,7 +336,7 @@ function PhotoTab({ image, onChange, error, canAdd = true }: PhotoTabProps) {
   }
 
   // const fetchUserProfile = async () => {
-  //   const res = await axios.get("/api/user_profile", { withCredentials: true });
+  //   const res = await api.get("/api/user_profile", { withCredentials: true });
   //   return res.data.profile;
   // };
 
@@ -614,7 +613,7 @@ function PersonalTab({
           </Field>
         )}
 
-        <Field label="Passport Number"  error={errors.passport_no}>
+        <Field label="Passport Number" error={errors.passport_no}>
           <FlameInput
             name="passport_no"
             value={formData.passport_no || ""}
@@ -1813,6 +1812,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import LogoutButton from "@/app/components/LogoutButton";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 export function calculateProfileProgress(job, profile) {
   // Return 0 if either object is missing
@@ -1874,6 +1874,7 @@ export function calculateProfileProgress(job, profile) {
   // Calculate percentage
   return Math.round((completedCount / totalRequired) * 100);
 }
+
 export default function ProfileTabs() {
   const [activeTab, setActiveTab] = useState<TabId>("photo");
   const [saving, setSaving] = useState(false);
@@ -1881,6 +1882,51 @@ export default function ProfileTabs() {
   const [formData, setFormData] = useState<ProfileFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const QueryClient = useQueryClient();
+  //new chnages for confirmed modeL
+
+  const [pendingDelete, setPendingDelete] = useState<{
+    key: "experience" | "education" | "certificates" | "memberships";
+    id: number;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const ENTRY_LABELS = {
+    experience: "experience",
+    education: "education",
+    certificates: "certificate",
+    memberships: "membership",
+  };
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const { key, id } = pendingDelete;
+    if ((formData[key] as any[]).length === 1) {
+      setPendingDelete(null);
+      return;
+    }
+
+    try {
+      // Only saved rows exist on the server (temporary ids come from Date.now())
+      const isPersistedId = id < 10_000_000_000;
+      if (isPersistedId) {
+        await api.delete(`${DELETE_ENDPOINTS[key]}/${id}`);
+      }
+
+      setFormData((prev) => {
+        const list = prev[key] as any[];
+        if (list.length === 1) return prev;
+        return { ...prev, [key]: list.filter((entry) => entry.id !== id) };
+      });
+
+      toast.success(`${ENTRY_LABELS[key]} removed`);
+      setPendingDelete(null);
+    } catch (err) {
+      if ((err as any)?.response?.status === 401) return; // interceptor redirects
+      toast.error("Could not delete. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+  // end changes
 
   const { data: profile } = useUserProfile();
   const { jobId, job, exists, isLoading } = useFindingId();
@@ -1888,7 +1934,7 @@ export default function ProfileTabs() {
   const { data: applied } = useQuery({
     queryKey: ["application_status", job?.id],
     queryFn: async () => {
-      const res = await axios.get(`/api/applications/status?jobId=${job?.id}`, {
+      const res = await api.get(`/api/applications/status?jobId=${job?.id}`, {
         withCredentials: true,
       });
       return res.data as { applied: boolean; applicationId: number | null };
@@ -2329,29 +2375,8 @@ export default function ProfileTabs() {
           [key]: [...(prev[key] as any[]), makeEmpty(Date.now())],
         }));
       },
-      onRemove: async (id: number) => {
-        const confirmed = window.confirm(
-          `Are you sure you want to delete this ${key.slice(0, -1)}?`,
-        );
-        if (!confirmed) return;
-
-        setFormData((prev) => {
-          const list = prev[key] as any[];
-          if (list?.length === 1) return prev;
-          return { ...prev, [key]: list.filter((entry) => entry.id !== id) };
-        });
-
-        const isPersistedId = id < 10_000_000_000;
-        if (!isPersistedId) return;
-
-        try {
-          await axios.delete(`${DELETE_ENDPOINTS[key]}/${id}`, {
-            withCredentials: true,
-          });
-        } catch (err) {
-          console.error(`Failed to delete ${key} entry`, err);
-          alert("Something went wrong while deleting. Please try again.");
-        }
+      onRemove: (id: number) => {
+        setPendingDelete({ key, id });
       },
     };
   }
@@ -2388,7 +2413,7 @@ export default function ProfileTabs() {
           }
           const photoPayload = new FormData();
           photoPayload.append("pic", formData.image);
-          await axios.post("/api/user_profile", photoPayload, {
+          await api.post("/api/user_profile", photoPayload, {
             withCredentials: true,
           });
           break;
@@ -2403,14 +2428,14 @@ export default function ProfileTabs() {
             memberships,
             ...personalData
           } = formData;
-          await axios.patch("/api/profile", personalData, {
+          await api.patch("/api/profile", personalData, {
             withCredentials: true,
           });
           break;
         }
 
         case "experience": {
-          await axios.patch(
+          await api.patch(
             "/api/profile",
             { experience: formData.experience },
             { withCredentials: true },
@@ -2418,7 +2443,7 @@ export default function ProfileTabs() {
           break;
         }
         case "education": {
-          await axios.patch(
+          await api.patch(
             "/api/profile",
             { education: formData.education },
             { withCredentials: true },
@@ -2444,7 +2469,7 @@ export default function ProfileTabs() {
             }
           });
 
-          const res = await axios.patch("/api/profile", payload, {
+          const res = await api.patch("/api/profile", payload, {
             withCredentials: true,
           });
 
@@ -2455,7 +2480,7 @@ export default function ProfileTabs() {
           break;
         }
         case "memberships": {
-          await axios.patch(
+          await api.patch(
             "/api/profile",
             { memberships: formData.memberships },
             { withCredentials: true },
@@ -2530,10 +2555,18 @@ export default function ProfileTabs() {
       className="min-h-screen py-10 px-4"
       style={{ background: flame.paper }}
     >
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`Delete this ${pendingDelete ? ENTRY_LABELS[pendingDelete.key] : "entry"}?`}
+        message="This action cannot be undone."
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
       <div className="mb-6 flex items-center justify-around gap-3">
         {/* <div className="w-52 h-10 rounded-lg flex items-center justify-between shrink-0"> */}
-          <img src="/assests/logo-full.png" alt=""  className="w-auto h-12"/>
-          <LogoutButton />
+        <img src="/assests/logo-full.png" alt="" className="w-auto h-12" />
+        <LogoutButton />
         {/* </div> */}
         {/* <div>
           <h1 className="text-xl font-semibold" style={{ color: flame.ink }}>
@@ -2649,7 +2682,7 @@ export default function ProfileTabs() {
                     aria-selected={isActive}
                     disabled={saving}
                     onClick={() => setActiveTab(tab.id)}
-                    className="relative flex items-center gap-2 px-5 py-3.5 mt-1.5 rounded-t-md text-sm whitespace-nowrap transition-colors focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="relative flex items-center gap-2 px-5 py-3.5 mt-1.5 rounded-t-md text-sm whitespace-nowrap transition-colors focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                     style={{
                       color: isActive ? flame.core : "#334155",
                       fontWeight: isActive ? 700 : 600,

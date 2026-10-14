@@ -3,7 +3,7 @@
 import React, { useState, type ChangeEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
+import api from "@/app/lib/api";
 import { CheckCircle2, FileText, Paperclip, Flame } from "lucide-react";
 import { getJob } from "@/app/lib/jobs";
 import useUserProfile from "@/app/lib/fetchUserProfile";
