@@ -93,6 +93,7 @@ export async function PATCH(req: NextRequest) {
         alreadyWorkedSsgc: parseSafeBoolean(body.already_worked_ssgc),
         ssgcEmployeeName: body.ssgc_employee_name,
         ssgcEmployeeNumber: body.ssgc_employee_number,
+       isPakistani: parseSafeBoolean(body.is_pakistani),
       },
     });
     return NextResponse.json({ profile: updated });

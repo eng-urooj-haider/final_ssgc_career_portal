@@ -229,7 +229,6 @@ export default function JobApplicationConfirmPage() {
   const params = useParams<{ id: string }>();
   const jobId = params?.id as string;
   const queryClient = useQueryClient();
-
   const {
     data: job,
     isLoading: isLoadingJob,
@@ -242,7 +241,7 @@ export default function JobApplicationConfirmPage() {
     },
     enabled: Boolean(jobId),
   });
-
+  console.log("job", job);
   const { data: profile, isLoading: isLoadingProfile } = useUserProfile();
 
   const experiences: ExperienceEntry[] = profile?.experiences ?? [];
@@ -304,7 +303,7 @@ export default function JobApplicationConfirmPage() {
       if (doc1) body.append("doc_1", doc1);
       if (doc2) body.append("doc_2", doc2);
       body.append("job_id", jobId);
-     const res =  await axios.post("/api/applications/finish", body, {
+      const res = await api.post("/api/applications/finish", body, {
         withCredentials: true,
       });
       await queryClient.invalidateQueries({ queryKey: ["applications"] });
@@ -321,7 +320,7 @@ export default function JobApplicationConfirmPage() {
 
   async function handleCancelAndLogout() {
     try {
-      await axios.post("/api/logout", {}, { withCredentials: true });
+      await api.post("/api/logout", {}, { withCredentials: true });
     } finally {
       router.push("/login");
     }

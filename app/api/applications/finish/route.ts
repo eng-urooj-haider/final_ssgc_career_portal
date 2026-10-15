@@ -36,15 +36,16 @@ export async function POST(req: NextRequest) {
 
     // 2. job_id
     const jobIdRaw = formData.get("job_id");
-    const jobId = Number(jobIdRaw);
-    if (!jobIdRaw || Number.isNaN(jobId)) {
+    console.log('jobIdRaw' , jobIdRaw)
+    const jobId = jobIdRaw;
+    if (!jobIdRaw) {
       return NextResponse.json(
         { message: "job_id is required and must be a valid number" },
         { status: 400 },
       );
     }
 
-    const job = await prisma.job.findUnique({ where: { id: jobId } });
+    const job = await prisma.job.findUnique({ where: { uuid: jobId } });
     if (!job) {
       return NextResponse.json({ message: "Job not found" }, { status: 404 });
     }
@@ -144,7 +145,7 @@ export async function POST(req: NextRequest) {
     const application = await prisma.jobApplication.create({
       data: {
         userId,
-        jobId,
+        jobId:job.id,
         selectedExperienceIds: experienceIds,
         selectedCertificateIds: certificateIds,
         doc1Path,

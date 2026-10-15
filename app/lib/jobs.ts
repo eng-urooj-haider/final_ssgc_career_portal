@@ -1,7 +1,6 @@
 // app/lib/jobs.ts
-import axios from "axios";
 import type { JobFormData } from "../components/jobs/JobForm";
-
+import api from "./api";
 interface FetchJobsParams {
   pageIndex: number;
   pageSize: number;
@@ -33,7 +32,7 @@ export const getJobs = async ({
   pageSize,
   search,
 }: FetchJobsParams): Promise<JobsResponse> => {
-  const response = await axios.get("/api/jobs", {
+  const response = await api.get("/api/jobs", {
     params: {
       page: pageIndex + 1, // your API is 1-indexed, TanStack Table is 0-indexed
       limit: pageSize,
@@ -48,7 +47,7 @@ export const getReport = async ({
   search,
   id,
 }: FetchReportParams): Promise<JobsResponse> => {
-  const response = await axios.get("/api/reports", {
+  const response = await api.get("/api/reports", {
     params: {
       page: pageIndex + 1, // your API is 1-indexed, TanStack Table is 0-indexed
       limit: pageSize,
@@ -82,7 +81,7 @@ function buildJobFormData(data: JobFormData): FormData {
 
 export const createJob = async (data: JobFormData): Promise<JobResponse> => {
   const body = buildJobFormData(data);
-  const response = await axios.post("/api/jobs", body, {
+  const response = await api.post("/api/jobs", body, {
     withCredentials: true,
   });
   return response.data;
@@ -93,14 +92,15 @@ export const updateJob = async (
   data: JobFormData,
 ): Promise<JobResponse> => {
   const body = buildJobFormData(data);
-  const response = await axios.put(`/api/jobs/${id}`, body, {
+  const response = await api.put(`/api/jobs/${id}`, body, {
     withCredentials: true,
   });
   return response.data;
 };
 export const getJob = async (uuid: string): Promise<JobsResponse> => {
-  const response = await axios.get(`/api/jobs/${uuid}`);
-  return response.data.data;
+  const response = await api.get(`/api/jobs/${uuid}`);
+console.log('getJob' , response.data.data)
+  return response.data;
 };
 
 interface JobResponse {
