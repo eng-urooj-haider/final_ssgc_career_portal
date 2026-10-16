@@ -29,7 +29,7 @@ export const GET = async (req: NextRequest) => {
     const search = (searchParams.get("search") ?? "").trim();
 
     // const jobId = Number(searchParams.get("id"));
-    const uuid = searchParams.get("id") ?? "";
+    const uuid = searchParams.get("uuid") ?? "";
     const job = await prisma.job.findUnique({
       where: { uuid },
       select: { id: true },
@@ -69,6 +69,8 @@ export const GET = async (req: NextRequest) => {
           id: true,
           createdAt: true,
           cv: true,
+          doc1Path: true,
+          doc2Path: true,
           user: {
             select: {
               email: true,

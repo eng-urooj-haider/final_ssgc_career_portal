@@ -16,33 +16,9 @@ import {
   Pencil,
   Users,
 } from "lucide-react";
-import { getJob } from "../../lib/jobs";
+import { getJob, type JobRecord } from "../../lib/jobs";
 import { flame, flameGradient } from "../../lib/flameTheme";
 import { htmlToPlainText } from "../../lib/textFormat";
-
-/* ------------------------------ Types ------------------------------ */
-
-interface Job {
-  id: number;
-  jobCode: string;
-  title: string;
-  cities: string[];
-  publicationDate: string;
-  deadline: string;
-  maxAge: number | null;
-  qualification: string;
-  skill: string | null;
-  responsibility: string | null;
-  specialInfo: string | null;
-  doc1Title: string | null;
-  doc1Attachment: string | null;
-  doc2Title: string | null;
-  doc2Attachment: string | null;
-  req1DocTitle: string | null;
-  req2DocTitle: string | null;
-  jobType: string;
-  email: string | null;
-}
 
 /* ----------------------------- Helpers ----------------------------- */
 
@@ -253,8 +229,7 @@ export default function JobDetailsPage() {
     );
   }
 
-  // Adjust if getJob returns the job directly instead of { data }
-  const job: Job | undefined = apiData?.data ?? apiData;
+  const job: JobRecord | undefined = apiData?.data;
 
   if (isError || !job) {
     return (
@@ -298,12 +273,6 @@ export default function JobDetailsPage() {
       <Card accent className="mb-6">
         <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-6 sm:px-8">
           <div className="flex min-w-0 items-start gap-4">
-            {/* <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg"
-              style={{ background: flameGradient }}
-            >
-              <Briefcase className="h-6 w-6 text-white" />
-            </div> */}
             <img
               src="/assests/logo-full.png"
               className="h-10 w-auto"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/lib/db"; // Adjust path to your Prisma client
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { verifyToken } from "@/app/lib/auth";
 
 interface CertificateMeta {
   id?: number | null;
@@ -10,7 +11,15 @@ interface CertificateMeta {
   issue_date: string;
   document?: string | null;
 }
-
+function getUserId(req: NextRequest): number | null {
+  const token = req.cookies.get("token")?.value;
+  if (!token) return null;
+  try {
+    return verifyToken(token).userId ?? null;
+  } catch {
+    return null; // expired or invalid
+  }
+}
 export async function PATCH(req: NextRequest) {
   try {
     // 1. Next.js native FormData parser
@@ -23,8 +32,16 @@ export async function PATCH(req: NextRequest) {
     );
 
     // Placeholder for auth user ID (replace with your auth session e.g. NextAuth/Kinde/Clerk)
-    const userId = 1;
-
+    const userId = getUserId(req);
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const profile = await prisma.profile.findFirst({
+      where: { userId: userId },
+    });
+    if (!profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     // Ensure local upload directory exists
     const uploadDir = path.join(process.cwd(), "public/uploads/certificates");
     await mkdir(uploadDir, { recursive: true });
@@ -33,7 +50,7 @@ export async function PATCH(req: NextRequest) {
     const updatedCertificates = await prisma.$transaction(async (tx) => {
       // Find existing certificates to clean up removed entries
       const existingCerts = await tx.certificate.findMany({
-        where: { userId },
+        where: { profileId: profile.id },
         select: { id: true },
       });
       const existingIds = existingCerts.map((c) => c.id);
@@ -76,10 +93,10 @@ export async function PATCH(req: NextRequest) {
           const updated = await tx.certificate.update({
             where: { id: cert.id },
             data: {
-              name: cert.name,
+              certificateName: cert.name,
               organisation: cert.organisation,
               issueDate: cert.issue_date,
-              documentUrl: documentUrl,
+              document: documentUrl ?? '',
             },
           });
           results.push(updated);
@@ -87,11 +104,11 @@ export async function PATCH(req: NextRequest) {
           // Create new
           const created = await tx.certificate.create({
             data: {
-              userId: userId,
-              name: cert.name,
+              profileId: profile.id,
+              certificateName: cert.name,
               organisation: cert.organisation,
               issueDate: cert.issue_date,
-              documentUrl: documentUrl,
+              document: documentUrl ?? '',
             },
           });
           results.push(created);

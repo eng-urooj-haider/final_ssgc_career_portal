@@ -7,8 +7,15 @@ import DataTable from "../components/ui/DataTable";
 import { getJobs } from "../lib/jobs";
 import { flame, flameGradient } from "../lib/flameTheme";
 import LogoutButton from "../components/LogoutButton";
-
-const columns = [
+import type { ColumnDef } from "@tanstack/react-table";
+type JobRow = {
+  id: number;
+  uuid: string;
+  jobCode: string;
+  title: string;
+  deadline_formatted: string;
+};
+const columns: ColumnDef<any, JobRow>[] = [
   {
     id: "index",
     header: "#",

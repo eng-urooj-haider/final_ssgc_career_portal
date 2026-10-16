@@ -1,16 +1,40 @@
 // app/lib/jobs.ts
 import type { JobFormData } from "../components/jobs/JobForm";
 import api from "./api";
+
 interface FetchJobsParams {
   pageIndex: number;
   pageSize: number;
   search: string;
 }
+
 interface FetchReportParams {
   pageIndex: number;
   pageSize: number;
   search: string;
-  uuid:string;
+  uuid: string;
+}
+
+export interface JobRecord {
+  id: number;
+  jobCode: string;
+  title: string;
+  cities: string[];
+  publicationDate: string;
+  deadline: string;
+  maxAge: number | null;
+  qualification: string;
+  skill: string;
+  responsibility: string;
+  specialInfo: string;
+  doc1Title: string;
+  doc2Title: string;
+  req1DocTitle: string;
+  req2DocTitle: string;
+  jobType: string;
+  email: string;
+  doc1Attachment: string | null;
+  doc2Attachment: string | null;
 }
 
 interface JobsResponse {
@@ -27,6 +51,36 @@ interface JobsResponse {
   to: number;
 }
 
+interface SingleJobResponse {
+  message?: string;
+  data: JobRecord;
+}
+export interface ReportRow {
+  id: number;
+  firstName: string;
+  lastName: string;
+  cnic: string;
+  createdAt: string;
+  cv: string | null;
+  doc1Path: string | null;
+  doc2Path: string | null;
+}
+
+interface PagedResponse<T> {
+  data: T[];
+  total: number;
+  last_page: number;
+  from: number;
+  to: number;
+}
+
+// Axios throws on 404, so a status check after the call never runs.
+// Convert the error here so the page can show "not found".
+function toAppError(err: unknown): never {
+  if ((err as any)?.response?.status === 404) throw new Error("NOT_FOUND");
+  throw err;
+}
+
 export const getJobs = async ({
   pageIndex,
   pageSize,
@@ -34,39 +88,37 @@ export const getJobs = async ({
 }: FetchJobsParams): Promise<JobsResponse> => {
   const response = await api.get("/api/jobs", {
     params: {
-      page: pageIndex + 1, // your API is 1-indexed, TanStack Table is 0-indexed
+      page: pageIndex + 1,
       limit: pageSize,
       search,
     },
   });
   return response.data;
 };
+
 export const getReport = async ({
   pageIndex,
   pageSize,
   search,
-  id,
-}: FetchReportParams): Promise<JobsResponse> => {
-  const response = await api.get("/api/reports", {
-    params: {
-      page: pageIndex + 1, // your API is 1-indexed, TanStack Table is 0-indexed
-      limit: pageSize,
-      search,
-      id,
-    },
-  });
-  if (response.status === 404) throw new Error("NOT_FOUND");
-  return response.data;
+  uuid,
+}: FetchReportParams): Promise<PagedResponse<ReportRow>> => {
+  try {
+    const response = await api.get("/api/reports", {
+      params: { page: pageIndex + 1, limit: pageSize, search, uuid },
+    });
+    return response.data;
+  } catch (err) {
+    return toAppError(err);
+  }
 };
 
-interface JobResponse {
+interface MutationResponse {
   message: string;
   data: {
     id: number;
   };
 }
 
-// Shared FormData-building logic used by both create and update
 function buildJobFormData(data: JobFormData): FormData {
   const body = new FormData();
   Object.entries(data).forEach(([key, value]) => {
@@ -79,7 +131,9 @@ function buildJobFormData(data: JobFormData): FormData {
   return body;
 }
 
-export const createJob = async (data: JobFormData): Promise<JobResponse> => {
+export const createJob = async (
+  data: JobFormData,
+): Promise<MutationResponse> => {
   const body = buildJobFormData(data);
   const response = await api.post("/api/jobs", body, {
     withCredentials: true,
@@ -90,22 +144,19 @@ export const createJob = async (data: JobFormData): Promise<JobResponse> => {
 export const updateJob = async (
   id: string | number,
   data: JobFormData,
-): Promise<JobResponse> => {
+): Promise<MutationResponse> => {
   const body = buildJobFormData(data);
   const response = await api.put(`/api/jobs/${id}`, body, {
     withCredentials: true,
   });
   return response.data;
 };
-export const getJob = async (uuid: string): Promise<JobsResponse> => {
-  const response = await api.get(`/api/jobs/${uuid}`);
-console.log('getJob' , response.data.data)
-  return response.data;
-};
 
-interface JobResponse {
-  message: string;
-  data: {
-    id: number;
-  };
-}
+export const getJob = async (uuid: string): Promise<SingleJobResponse> => {
+  try {
+    const response = await api.get(`/api/jobs/${uuid}`);
+    return response.data;
+  } catch (err) {
+    return toAppError(err);
+  }
+};

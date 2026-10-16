@@ -5,6 +5,7 @@ import React, {
   useRef,
   useEffect,
   useMemo,
+  Suspense,
   type ReactNode,
   type ChangeEvent,
 } from "react";
@@ -38,7 +39,6 @@ import LogoutButton from "@/app/components/LogoutButton";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { flame } from "../../lib/flameTheme";
 import api from "../../lib/api";
-
 type TabId =
   | "photo"
   | "personal"
@@ -289,8 +289,9 @@ function FlameTextarea(
 
 interface FormSelectFieldProps
   extends
-    FieldProps,
+    Omit<FieldProps, "children">, // Omit mandatory children from FieldProps
     Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "children"> {
+  children?: ReactNode; // Make children optional
   options: { label: string; value: string | number; disabled?: boolean }[];
   placeholder?: string;
   isLoading?: boolean;
@@ -560,7 +561,7 @@ interface PersonalFormData {
   already_worked_ssgc: string;
   ssgc_employee_name: string;
   ssgc_employee_number: string;
-  is_pakistani:string;
+  is_pakistani: string;
 }
 
 interface PersonalTabProps {
@@ -1227,7 +1228,7 @@ function EducationRow({
   const { data: qualifications = [], isLoading: isLoadingQualifications } =
     useQuery({
       queryKey: ["qualifications", entry.qualification_group_id],
-      queryFn: () => getQualifications(entry.qualification_group_id),
+      queryFn: () => getQualifications(),
       enabled: !!entry.qualification_group_id,
       staleTime: 1000 * 60 * 60,
     });
@@ -1791,7 +1792,7 @@ const initialFormData: ProfileFormData = {
   already_worked_ssgc: "",
   ssgc_employee_name: "",
   ssgc_employee_number: "",
-  is_pakistani:"",
+  is_pakistani: "",
   experience: [emptyExperience(1)],
   education: [emptyEducation(1)],
   certificates: [emptyCertificate(1)],
@@ -1864,7 +1865,7 @@ function formatDeadline(deadline: unknown): string {
   return `${day}-${month}-${d.getFullYear()}`;
 }
 
-export default function ProfileTabs() {
+function ProfileTabsContent() {
   const [activeTab, setActiveTab] = useState<TabId>("photo");
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -2558,10 +2559,10 @@ export default function ProfileTabs() {
               <tbody>
                 <tr>
                   <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
-                    {job?.jobCode ?? job?.code ?? "-"}
+                    {job?.jobCode ?? "-"}
                   </td>
                   <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
-                    {job?.jobTitle ?? job?.title ?? "-"}
+                    {job?.title ?? "-"}
                   </td>
                   <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
                     {formatDeadline(job?.deadline)}
@@ -2726,5 +2727,21 @@ export default function ProfileTabs() {
         </div>
       </div>
     </div>
+  );
+}
+export default function ProfileTabs() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="min-h-screen flex items-center justify-center"
+          style={{ background: flame.paper }}
+        >
+          <p className="text-slate-600 font-medium">Loading...</p>
+        </div>
+      }
+    >
+      <ProfileTabsContent />
+    </Suspense>
   );
 }

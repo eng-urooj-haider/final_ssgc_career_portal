@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
-// import jsPDF from "jspdf";
-// import autoTable from "jspdf-autotable";
+import { useQuery } from "@tanstack/react-query";
 import {
   useTable,
   tableFeatures,
@@ -11,11 +9,13 @@ import {
   globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
-  columnVisibilityFeature, // ← add this import
+  columnVisibilityFeature,
   createFilteredRowModel,
   createSortedRowModel,
   createPaginatedRowModel,
   flexRender,
+  type ColumnDef,
+  type SortingState,
 } from "@tanstack/react-table";
 
 const features = tableFeatures({
@@ -23,13 +23,38 @@ const features = tableFeatures({
   globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
-  columnVisibilityFeature, // ← add this here too
+  columnVisibilityFeature,
   filteredRowModel: createFilteredRowModel(),
   sortedRowModel: createSortedRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
 });
 
-const DataTable = ({
+interface FetchDataParams {
+  pageIndex: number;
+  pageSize: number;
+  search: string;
+  id: any;
+}
+
+interface ApiResponse<TData> {
+  data?: TData[];
+  total?: number;
+  from?: number;
+  to?: number;
+  last_page?: number;
+}
+
+interface DataTableProps<TData = any> {
+  columns: any[];   // was ColumnDef<any, any>[]
+  fetchData: (params: FetchDataParams) => Promise<ApiResponse<TData>>;
+  queryKey: string;
+  pageSize?: number;
+  searchPlaceholder?: string;
+  showExportButtons?: boolean;
+  id?: any;
+}
+
+const DataTable = <TData = any,>({
   columns,
   fetchData,
   queryKey,
@@ -37,11 +62,12 @@ const DataTable = ({
   searchPlaceholder = "Search…",
   showExportButtons = false,
   id = null,
-  // status,
-}) => {
-  const [sorting, setSorting] = useState([]);
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // handleExportExcel = () => {},
+  // handleExportPdf = () => {},
+}: DataTableProps<TData>) => {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize });
 
   const isSearchAction = useRef(false);
@@ -60,30 +86,21 @@ const DataTable = ({
     data: apiData,
     isFetching,
     isError,
-    error,
     isPending,
   } = useQuery({
-    queryKey: [queryKey, pagination, debouncedSearch],
-    queryFn: () => {
-      // const skipLoader = isSearchAction.current;
-      // isSearchAction.current = false;
-      return fetchData({
+    queryKey: [queryKey, pagination, debouncedSearch, id],
+    queryFn: () =>
+      fetchData({
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         search: debouncedSearch,
         id,
-        // skipLoader,
-        // status,
-      });
-    },
-    // placeholderData: keepPreviousData,
-    // staleTime: 30000,
+      }),
     refetchOnWindowFocus: false,
     retry: 1,
   });
 
   const data = apiData?.data ?? [];
-  console.log("dataaaaa", data[0]?.user?.profile);
   const totalRows = apiData?.total ?? 0;
   const from = apiData?.from ?? 0;
   const to = apiData?.to ?? 0;
@@ -91,8 +108,8 @@ const DataTable = ({
 
   const table = useTable({
     features,
-    data,
-    columns,
+    data: data as any,
+    columns: columns as any,
     state: { sorting, globalFilter, pagination },
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
@@ -104,6 +121,7 @@ const DataTable = ({
 
   const rows = table.getRowModel().rows;
   const pageIndex = pagination.pageIndex;
+
   return (
     <div className="relative w-full min-w-0 overflow-x-auto overflow-y-visible rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
       {/* Toolbar */}
@@ -138,18 +156,18 @@ const DataTable = ({
 
         {showExportButtons && (
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            {/* <button
               onClick={handleExportExcel}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
             >
               Export Excel
-            </button>
-            <button
+            </button> */}
+            {/* <button
               onClick={handleExportPdf}
               className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-gray-200 transition hover:bg-gray-50"
             >
               Download PDF
-            </button>
+            </button> */}
             <span className="shrink-0 text-xs text-gray-500">
               {totalRows} {totalRows === 1 ? "result" : "results"}
             </span>
@@ -161,10 +179,10 @@ const DataTable = ({
       <div className="w-full min-w-0 overflow-x-auto">
         <table className="w-full min-w-full table-fixed border-collapse text-left text-sm">
           <colgroup>
-            {columns.map((col) => (
+            {columns.map((col, idx) => (
               <col
-                key={col.id ?? col.accessorKey}
-                style={{ width: col.meta?.width ?? "auto" }}
+                key={col.id ?? (col as any).accessorKey ?? idx}
+                style={{ width: (col.meta as any)?.width ?? "auto" }}
               />
             ))}
           </colgroup>
@@ -228,7 +246,7 @@ const DataTable = ({
                 <tr key={`skeleton-${i}`} className="border-b border-gray-100">
                   {columns.map((col, j) => (
                     <td
-                      key={col.id ?? col.accessorKey ?? j}
+                      key={col.id ?? (col as any).accessorKey ?? j}
                       className="px-4 py-3"
                     >
                       <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
@@ -243,7 +261,7 @@ const DataTable = ({
                   colSpan={columns.length}
                   className="px-4 py-10 text-center text-sm text-red-500"
                 >
-                  Failed to load data,job not found
+                  Failed to load data, job not found
                 </td>
               </tr>
             )}

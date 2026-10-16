@@ -117,6 +117,7 @@ export interface CvInput {
     currentAddress?: string | null;
     cnic?: string | null;
     professionalSummary?: string | null;
+    isPakistani?: boolean;
     experiences: {
       jobTitle: string;
       company: string;
@@ -125,11 +126,14 @@ export interface CvInput {
       responsibility?: string | null;
     }[];
     education: {
+      qualification?: { name?: string } | string | null;
+      institution?: { name?: string } | string | null;
       majorSubject?: string | null;
       instituteOther?: string | null;
       passingYear?: string | number | null;
       divisionGrade?: string | null;
-      obtainedMarksGpa?: string | null;
+      obtainedMarks?: string | number | null;
+      totalMarks?: string | number | null;
     }[];
     certificates: {
       certificateName: string;
@@ -145,7 +149,7 @@ export interface CvInput {
     id: number;
     createdAt: Date | string;
   };
-  achievements?: string[]; // optional until a real Achievement model exists
+  achievements?: string[];
 }
 
 interface CvData {
@@ -206,35 +210,18 @@ function fmtYear(d: Date | string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? "-" : date.getFullYear().toString();
 }
 
-// function computeTotalYears(
-//   ranges: [Date | string | null | undefined, Date | string | null | undefined][]
-// ): string {
-//   let totalMonths = 0;
-//   for (const [start, end] of ranges) {
-//     if (!start) continue;
-//     const s = new Date(start);
-//     const e = end ? new Date(end) : new Date();
-//     if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) continue;
-//     totalMonths += (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
-//   }
-//   if (totalMonths <= 0) return "-";
-//   const years = Math.floor(totalMonths / 12);
-//   const months = totalMonths % 12;
-//   return months > 0 ? `${years}y ${months}m` : `${years}y`;
-// }
-
 function computeTotalYears(
   ranges: [
     Date | string | null | undefined,
     Date | string | null | undefined,
   ][],
 ): string {
-  const workedMonths = new Set<number>(); // keeps each month only once
+  const workedMonths = new Set<number>();
 
   for (const [start, end] of ranges) {
     if (!start) continue;
     const s = new Date(start);
-    const e = end ? new Date(end) : new Date(); // no end date = still working
+    const e = end ? new Date(end) : new Date();
     if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) continue;
 
     const startMonth = s.getFullYear() * 12 + s.getMonth();
@@ -275,9 +262,7 @@ function CvDocument({ data }: { data: CvData }) {
     <Document>
       <Page size="A4" style={styles.page}>
         <Text style={styles.reportTitle}>DIGITAL CANDIDATE RESUME REPORT</Text>
-        <Text style={styles.reportSubtitle}>
-          {/* Automated Recruitment System Application Record */}
-        </Text>
+        <Text style={styles.reportSubtitle} />
 
         <View style={styles.topRow}>
           <View style={styles.topRowLeft}>
@@ -480,9 +465,10 @@ function CvDocument({ data }: { data: CvData }) {
 // Public entry point
 // ---------------------------------------------------------------------------
 
+
 export async function buildCvPdf(input: CvInput): Promise<Buffer> {
-  const { profile, job, application, experiences } = input;
-  console.log(input);
+  const { profile, job, application } = input;
+
   const data: CvData = {
     fullName: `${profile.firstName} ${profile.lastName}`.trim(),
     positionAppliedFor: job.title,
@@ -492,36 +478,45 @@ export async function buildCvPdf(input: CvInput): Promise<Buffer> {
     dateOfApplication: fmtDate(application.createdAt),
     statusNotice: "-",
     totalExperienceYears: computeTotalYears(
-      profile.experiences.map((e) => [e.startDate, e.endDate]),
+      (profile.experiences ?? []).map((e) => [e.startDate, e.endDate]),
     ),
     relevantExperienceYears: computeTotalYears(
-      experiences?.map((e) => [e.startDate, e.endDate]),
+      (profile.experiences ?? []).map((e) => [e.startDate, e.endDate]),
     ),
-    // relevantExperienceYears: "-",
     postQualificationYears: "-",
     gender: profile.gender ?? "-",
     mobileNumber:
       `${profile.mobilePrefix ?? ""}${profile.mobileNumber ?? ""}` || "-",
     email: profile.email ?? "-",
     dateOfBirth: fmtDate(profile.dateOfBirth),
-    nationality: profile.isPakistani == "1" ? "Yes" : "No",
+    nationality: profile.isPakistani ? "Pakistani" : profile.nationality ?? "-",
     homeAddress: profile.currentAddress ?? "-",
     cnic: profile.cnic ?? "-",
     professionalSummary: profile.professionalSummary ?? "",
-    education: profile.education.map((ed) => ({
-      qualification:
-        [ed.qualification?.name, ed.majorSubject].filter(Boolean).join(" - ") ||
-        "-",
-      institution: ed.institution?.name || ed.instituteOther || "-",
-      boardUniversity: ed.institution?.name || ed.instituteOther || "-",
-      yearOfCompletion: String(ed.passingYear ?? "-"),
-      gradeOrCgpa:
-        ed.divisionGrade ||
-        (ed.obtainedMarks != null && ed.totalMarks != null
-          ? `${ed.obtainedMarks}/${ed.totalMarks}`
-          : "-"),
-    })),
-    experiences: profile.experiences.map((e) => ({
+    education: (profile.education ?? []).map((ed) => {
+      const qualName =
+        typeof ed.qualification === "object"
+          ? ed.qualification?.name
+          : ed.qualification;
+      const instName =
+        typeof ed.institution === "object"
+          ? ed.institution?.name
+          : ed.institution;
+
+      return {
+        qualification:
+          [qualName, ed.majorSubject].filter(Boolean).join(" - ") || "-",
+        institution: instName || ed.instituteOther || "-",
+        boardUniversity: instName || ed.instituteOther || "-",
+        yearOfCompletion: String(ed.passingYear ?? "-"),
+        gradeOrCgpa:
+          ed.divisionGrade ||
+          (ed.obtainedMarks != null && ed.totalMarks != null
+            ? `${ed.obtainedMarks}/${ed.totalMarks}`
+            : "-"),
+      };
+    }),
+    experiences: (profile.experiences ?? []).map((e) => ({
       organization: e.company,
       designation: e.jobTitle,
       from: fmtDate(e.startDate),
@@ -533,12 +528,25 @@ export async function buildCvPdf(input: CvInput): Promise<Buffer> {
       totalExp: computeTotalYears([[e.startDate, e.endDate]]),
     })),
     achievements: input.achievements ?? [],
-    certifications: profile.certificates.map((c) => ({
+    certifications: (profile.certificates ?? []).map((c) => ({
       name: c.certificateName,
       issuingOrganization: c.organisation,
       year: fmtYear(c.issueDate),
     })),
   };
 
-  return await pdf(<CvDocument data={data} />).toBuffer();
+  // Convert the stream or Uint8Array returned by react-pdf into a standard Node Buffer
+  const pdfStream = await pdf(<CvDocument data={data} />).toBuffer();
+
+  // Handle case where pdfStream is returned as a stream/Uint8Array or Buffer
+  if (Buffer.isBuffer(pdfStream)) {
+    return pdfStream;
+  }
+
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of pdfStream as unknown as AsyncIterable<Uint8Array>) {
+    chunks.push(chunk);
+  }
+
+  return Buffer.concat(chunks);
 }

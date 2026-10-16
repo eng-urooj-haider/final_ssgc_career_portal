@@ -35,21 +35,20 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
 
     // 2. job_id
-    const jobIdRaw = formData.get("job_id");
-    console.log('jobIdRaw' , jobIdRaw)
-    const jobId = jobIdRaw;
-    if (!jobIdRaw) {
+    const jobId = String(formData.get("job_id") ?? "").trim();
+    if (!jobId) {
       return NextResponse.json(
-        { message: "job_id is required and must be a valid number" },
+        { message: "job_id is required" },
         { status: 400 },
       );
     }
-
     const job = await prisma.job.findUnique({ where: { uuid: jobId } });
     if (!job) {
-      return NextResponse.json({ message: "Job not found" }, { status: 404 });
+      return NextResponse.json(
+        { message: "Job posting not found" },
+        { status: 404 },
+      );
     }
-
     // 3. Profile (with everything the CV needs)
 
     const profile = await prisma.profile.findUnique({
@@ -74,21 +73,6 @@ export async function POST(req: NextRequest) {
         { status: 422 },
       );
     }
-
-    // 3b. Already applied? (JobApplication has @@unique([userId, jobId]))
-    // const existing = await prisma.jobApplication.findUnique({
-    //   where: { userId_jobId: { userId, jobId } },
-    //   select: { id: true },
-    // });
-    // if (existing) {
-    //   return NextResponse.json(
-    //     { message: "You have already applied for this job." },
-    //     { status: 409 },
-    //   );
-    // }
-
-    // 4. experience[] / certificate[] — ownership is checked against the
-    //    profile we already loaded, so no extra queries are needed.
     const experienceIds = toNumberArray(formData.getAll("experience[]"));
     const certificateIds = toNumberArray(formData.getAll("certificate[]"));
 
@@ -145,22 +129,23 @@ export async function POST(req: NextRequest) {
     const application = await prisma.jobApplication.create({
       data: {
         userId,
-        jobId:job.id,
+        jobId: job.id,
         selectedExperienceIds: experienceIds,
         selectedCertificateIds: certificateIds,
         doc1Path,
         doc2Path,
       },
     });
-    const ids = application?.selectedExperienceIds ?? [];
+    // const ids = application?.selectedExperienceIds ?? [];
 
-    const experiences = ids.length
-      ? await prisma.experience.findMany({
-          where: { id: { in: ids } },
-          orderBy: { startDate: "asc" },
-        })
-      : [];
+    // const experiences = ids.length
+    //   ? await prisma.experience.findMany({
+    //       where: { id: { in: ids } },
+    //       orderBy: { startDate: "asc" },
+    //     })
+    //   : [];
     // 8. Profile photo -> base64 data URI
+    const experiences = selectedExperiences; // pass this to buildCvPdf
     let userPicDataUri: string | null = null;
     if (profile.userPic) {
       const picPath = path.join(
@@ -175,23 +160,28 @@ export async function POST(req: NextRequest) {
     }
 
     // 9. Build and save the CV snapshot
+    // 9. Build and save the CV snapshot
     const pdfBuffer = await buildCvPdf({
       profile: {
         ...profile,
+        firstName: profile.firstName ?? "",
+        lastName: profile.lastName ?? "",
+        cnic: profile.cnic ?? "",
+        nationality:profile.isPakistani ? "Yes" : "No",
+        professionalSummary:  "",
         email: profile.user.email,
         userPic: userPicDataUri,
+        experiences: selectedExperiences, // Moved inside profile
       },
       job: {
         jobCode: job.jobCode,
         title: job.title,
       },
       application: {
-        id: application?.id, // shows APP-<real id> in the PDF
-        createdAt: application?.createdAt,
+        id: application.id,
+        createdAt: application.createdAt,
       },
-      experiences,
     });
-
     const cvDir = path.join(UPLOAD_ROOT, `job-${job.jobCode}`, "cv");
     await mkdir(cvDir, { recursive: true });
     const clean = (v: string | null) =>

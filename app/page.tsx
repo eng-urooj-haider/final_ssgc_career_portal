@@ -1,23 +1,10 @@
 // app/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Archivo, Inter } from "next/font/google";
 import { CalendarDays, Clock, Download, MapPin } from "lucide-react";
 import prisma from "./lib/db";
 import { flame, flameGradient } from "./lib/flameTheme";
 import { htmlToPlainText } from "./lib/textFormat";
-
-const archivo = Archivo({
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
-  variable: "--font-archivo",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-inter",
-});
 
 // Cached page. Also call revalidatePath("/") after creating, updating or
 // deleting a job so changes show up immediately.
@@ -221,8 +208,7 @@ function JobPosting({ job, now }: { job: JobRecord; now: number }) {
       <div
         className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5"
         // style={{ background: flame.ink }}
-            style={{ background: flameGradient }}
-
+        style={{ background: flameGradient }}
       >
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium uppercase tracking-wide text-white/60">
@@ -241,7 +227,7 @@ function JobPosting({ job, now }: { job: JobRecord; now: number }) {
       {/* Title + meta */}
       <div className="border-b border-[#E7E5E1] px-5 py-5">
         <h2
-          className="break-words font-[family-name:var(--font-archivo)] text-xl font-bold"
+          className="break-words text-xl font-bold"
           style={{ color: flame.ink }}
         >
           {job.title}
@@ -343,7 +329,7 @@ export default async function CareersPage() {
 
   return (
     <main
-      className={`${archivo.variable} ${inter.variable} min-h-screen font-[family-name:var(--font-inter)]`}
+      className="min-h-screen"
       style={{ background: flame.paper, color: flame.ink }}
     >
       <header className="">
@@ -366,9 +352,7 @@ export default async function CareersPage() {
 
       <div className="mx-auto max-w-4xl px-6 py-10">
         <div className="mb-8">
-          <h1 className="font-[family-name:var(--font-archivo)] text-2xl font-bold">
-            Current openings
-          </h1>
+          <h1 className="text-2xl font-bold">Current openings</h1>
           <p className="mt-1 text-sm text-slate-500">
             {current.length > 0
               ? `${current.length} open ${current.length === 1 ? "position" : "positions"} at Sui Southern Gas Company.`
@@ -387,9 +371,7 @@ export default async function CareersPage() {
         {archived.length > 0 && (
           <section className="mt-14">
             <hr className="border-[#E7E5E1]" />
-            <h2 className="mb-1 mt-8 font-[family-name:var(--font-archivo)] text-2xl font-bold">
-              Archived positions
-            </h2>
+            <h2 className="mb-1 mt-8 text-2xl font-bold">Archived positions</h2>
             <p className="mb-6 text-sm text-slate-500">
               Applications for these positions are closed.
             </p>

@@ -25,9 +25,7 @@ interface RegisterResponse {
   };
 }
 
-interface ApiErrorResponse {
-  message: string;
-}
+type ApiErrorResponse = { message?: string; fields?: Record<string, string[]> };
 
 type FormErrors = Partial<Record<keyof RegisterCredentials, string>>;
 // partial ?

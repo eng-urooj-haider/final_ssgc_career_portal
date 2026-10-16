@@ -21,7 +21,7 @@ export default function EditJobPage() {
   } = useQuery({
     queryKey: ["job", uuid],
     queryFn: () => getJob(uuid),
-    staleTime: 0, // always load fresh values when opening the edit form
+    staleTime: 0,
     retry: false,
   });
 
@@ -32,7 +32,7 @@ export default function EditJobPage() {
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
         queryClient.invalidateQueries({ queryKey: ["job", uuid] }),
       ]);
-       toast.success("Job updated successfully");
+      toast.success("Job updated successfully");
       router.push("/jobs");
     },
   });
@@ -45,8 +45,7 @@ export default function EditJobPage() {
     );
   }
 
-  // Adjust if getJob returns the job directly instead of { data }
-  const job = apiData?.data ?? apiData;
+  const job = apiData?.data;
 
   if (isError || !job) {
     return (
@@ -65,7 +64,7 @@ export default function EditJobPage() {
     >
       <JobForm
         isEdit
-        key={job.id} // remount if a different job is loaded
+        key={job.id}
         initialData={{
           job_code: job.jobCode ?? "",
           title: job.title ?? "",
