@@ -21,6 +21,7 @@
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "geist": "^1.7.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.22.0",

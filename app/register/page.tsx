@@ -1,4 +1,6 @@
+// app/register/page.tsx
 "use client";
+
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import axios, { AxiosError } from "axios";
@@ -18,24 +20,17 @@ interface RegisterCredentials {
 
 interface RegisterResponse {
   message: string;
-  data: {
-    id: number;
-    email: string;
-    role: string;
-  };
+  data: { id: number; email: string; role: string };
 }
 
 type ApiErrorResponse = { message?: string; fields?: Record<string, string[]> };
+type FieldName = keyof RegisterCredentials;
+type FormErrors = Partial<Record<FieldName, string>>;
 
-type FormErrors = Partial<Record<keyof RegisterCredentials, string>>;
-// partial ?
-// keyof union
-// record [key , type]
-
-const RegisterUser = async (
+const registerUser = async (
   credential: RegisterCredentials,
 ): Promise<RegisterResponse> => {
-  // Don't send confirmedPassword to the API — it's a client-side-only check
+  // confirmedPassword is a client-side-only check
   const { confirmedPassword, ...payload } = credential;
   const response = await axios.post<RegisterResponse>(
     "/api/auth/register",
@@ -45,31 +40,55 @@ const RegisterUser = async (
   return response.data;
 };
 
+// ---------------------------------------------------------------------------
+// Validation (keep in sync with the server schema)
+// ---------------------------------------------------------------------------
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// At least 8 chars, one uppercase, one lowercase, one number
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+// Same rules as the server: min 8, max 72, lower, upper, number, symbol
+const PASSWORD_RULES = [
+  { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
+  { label: "One lowercase letter", test: (p: string) => /[a-z]/.test(p) },
+  { label: "One uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
+  { label: "One number", test: (p: string) => /\d/.test(p) },
+  {
+    label: "One symbol (e.g. ! @ # $)",
+    test: (p: string) => /[^A-Za-z0-9]/.test(p),
+  },
+];
+const PASSWORD_MAX = 72;
+
 function formatCnic(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 13);
   if (d.length <= 5) return d;
   if (d.length <= 12) return `${d.slice(0, 5)}-${d.slice(5)}`;
   return `${d.slice(0, 5)}-${d.slice(5, 12)}-${d.slice(12)}`;
 }
+
 function validateField(
-  name: keyof RegisterCredentials,
+  name: FieldName,
   value: string,
   all: RegisterCredentials,
 ): string | undefined {
   switch (name) {
     case "email":
       if (!value.trim()) return "Email is required.";
-      if (!EMAIL_REGEX.test(value)) return "Enter a valid email address.";
+      if (!EMAIL_REGEX.test(value.trim())) return "Enter a valid email address.";
       return undefined;
 
-    case "password":
+    case "password": {
       if (!value) return "Password is required.";
-      if (!PASSWORD_REGEX.test(value))
-        return "Password must be 8+ characters with an uppercase letter, a lowercase letter, and a number.";
+      if (value.length > PASSWORD_MAX)
+        return `Password must be at most ${PASSWORD_MAX} characters.`;
+      const missing = PASSWORD_RULES.filter((r) => !r.test(value));
+      if (missing.length) {
+        return `Password still needs: ${missing
+          .map((r) => r.label.toLowerCase())
+          .join(", ")}.`;
+      }
       return undefined;
+    }
 
     case "confirmedPassword":
       if (!value) return "Please confirm your password.";
@@ -79,14 +98,13 @@ function validateField(
     case "firstName":
       if (!value.trim()) return "First name is required.";
       if (value.trim().length < 2) return "First name is too short.";
-      if (value.trim().length > 30) return "First name is too large.";
+      if (value.trim().length > 30) return "First name is too long.";
       return undefined;
 
     case "lastName":
       if (!value.trim()) return "Last name is required.";
       if (value.trim().length < 2) return "Last name is too short.";
-      if (value.trim().length > 30) return "Last name is too large.";
-
+      if (value.trim().length > 30) return "Last name is too long.";
       return undefined;
 
     case "gender":
@@ -105,12 +123,16 @@ function validateField(
 
 function validateAll(data: RegisterCredentials): FormErrors {
   const errors: FormErrors = {};
-  (Object.keys(data) as (keyof RegisterCredentials)[]).forEach((key) => {
+  (Object.keys(data) as FieldName[]).forEach((key) => {
     const message = validateField(key, data[key], data);
     if (message) errors[key] = message;
   });
   return errors;
 }
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function Page() {
   const router = useRouter();
@@ -126,31 +148,28 @@ export default function Page() {
     cnic: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<
-    Partial<Record<keyof RegisterCredentials, boolean>>
-  >({});
+  const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>(
+    {},
+  );
 
-  const RegisterMutation = useMutation({
-    mutationFn: RegisterUser,
+  const registerMutation = useMutation<
+    RegisterResponse,
+    AxiosError<ApiErrorResponse>,
+    RegisterCredentials
+  >({
+    mutationFn: registerUser,
     onSuccess: () => {
-      // router.push("/user/dashboard");
       window.location.assign(getSafeRedirect());
-    },
-    onError: (err: AxiosError<ApiErrorResponse>) => {
-      console.log(
-        "Register error:",
-        err.response?.data?.message ?? err.message,
-      );
     },
   });
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    const { name } = e.target;
-    const key = name as keyof RegisterCredentials;
+    // Clear the previous server error as soon as the user edits anything
+    if (registerMutation.isError) registerMutation.reset();
 
-    // CNIC: keep only digits, max 13
+    const key = e.target.name as FieldName;
     const value =
       key === "cnic"
         ? e.target.value.replace(/\D/g, "").slice(0, 13)
@@ -159,7 +178,7 @@ export default function Page() {
     const updated = { ...formDetail, [key]: value };
     setFormDetail(updated);
 
-    // Re-validate this field (and confirm-password if password changed) live once touched
+    // Validate live once the field was touched (password always, for the checklist)
     if (touched[key] || key === "password") {
       setErrors((prev) => ({
         ...prev,
@@ -180,8 +199,7 @@ export default function Page() {
   const handleBlur = (
     e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    const { name } = e.target;
-    const key = name as keyof RegisterCredentials;
+    const key = e.target.name as FieldName;
     const value =
       key === "cnic" ? e.target.value.replace(/\D/g, "") : e.target.value;
 
@@ -208,32 +226,26 @@ export default function Page() {
     });
 
     if (Object.keys(validationErrors).length > 0) return;
-
-    RegisterMutation.mutate(formDetail);
+    registerMutation.mutate(formDetail);
   };
 
-  // const apiErrorMessage = RegisterMutation.isError
-  //   ? (RegisterMutation.error.response?.data?.message ??
-  //     "Something went wrong. Please try again.")
-  //   : null;
-  type FieldErrors = Record<string, string[]>;
-
-  const responseData = RegisterMutation.isError
-    ? RegisterMutation.error.response?.data
+  // Server errors: per-field messages go under their input,
+  // general ones (network, 409, 500) go in the banner.
+  const responseData = registerMutation.isError
+    ? registerMutation.error.response?.data
     : undefined;
+  const serverFieldErrors: Record<string, string[]> = responseData?.fields ?? {};
+  const hasServerFieldErrors = Object.keys(serverFieldErrors).length > 0;
 
-  const fieldErrors: FieldErrors = responseData?.fields ?? {};
-  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
-
-  // Banner shows only when there are NO field errors (network, 409, 500...)
-  const apiErrorMessage = RegisterMutation.isError
-    ? hasFieldErrors
+  const bannerMessage = registerMutation.isError
+    ? hasServerFieldErrors
       ? null
       : (responseData?.message ?? "Something went wrong. Please try again.")
     : null;
 
-  // First message for a field, or undefined
-  const fieldError = (name: string) => fieldErrors[name]?.[0];
+  // Client error first, then the server error for the same field
+  const shownError = (name: FieldName): string | undefined =>
+    errors[name] ?? serverFieldErrors[name]?.[0];
 
   const fieldClass = (hasError?: string) =>
     `w-full rounded-lg border px-4 py-3 text-sm text-black outline-none transition focus:ring-2 disabled:bg-gray-100 ${
@@ -242,52 +254,36 @@ export default function Page() {
         : "border-gray-300 focus:border-[#F5A623] focus:ring-[#F5A623]/20"
     }`;
 
+  const labelClass = "mb-2 block text-sm font-medium text-[#333333]";
+  const pending = registerMutation.isPending;
+
   return (
     <main className="min-h-screen bg-[#FFF9F0] px-4 py-10">
       <div className="mx-auto flex min-h-[80vh] max-w-lg items-center justify-center">
         <div className="w-full rounded-2xl bg-white p-8 shadow-lg">
           {/* Header */}
-          <div className="mb-8 text-center flex items-center justify-center">
-            {/* <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#F5A623] text-lg font-bold text-white shadow-md"> */}
+          <div className="mb-8 flex items-center justify-center text-center">
             <img
               src="/assests/logo-full.png"
               className="h-20 w-auto"
               alt="SSGC logo"
             />
-            {/* </div> */}
-            {/* <p className="mt-2 text-sm text-gray-500">
-              Create your SSGC Careers Portal account
-            </p> */}
           </div>
 
-          {/* Error Message */}
-          {/* {apiErrorMessage && (
-            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-              {apiErrorMessage}
-            </div>
-          )} */}
-          {(apiErrorMessage || hasFieldErrors) && (
-            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-              {hasFieldErrors ? (
-                <ul className="list-disc pl-4">
-                  {Object.entries(fieldErrors).flatMap(([field, msgs]) =>
-                    msgs.map((m) => <li key={field + m}>{m}</li>),
-                  )}
-                </ul>
-              ) : (
-                apiErrorMessage
-              )}
+          {/* General (non-field) error */}
+          {bannerMessage && (
+            <div
+              role="alert"
+              className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600"
+            >
+              {bannerMessage}
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             {/* Email */}
             <div>
-              <label
-                htmlFor="email"
-                className="mb-2 block text-sm font-medium text-[#333333]"
-              >
+              <label htmlFor="email" className={labelClass}>
                 Email Address
               </label>
               <input
@@ -298,21 +294,20 @@ export default function Page() {
                 onChange={handleChange}
                 onBlur={handleBlur}
                 placeholder="Enter your email address"
-                className={fieldClass(errors.email)}
-                disabled={RegisterMutation.isPending}
-                aria-invalid={!!errors.email}
+                className={fieldClass(shownError("email"))}
+                disabled={pending}
+                aria-invalid={!!shownError("email")}
               />
-              {errors.email && (
-                <p className="mt-1 text-xs text-red-600">{errors.email}</p>
+              {shownError("email") && (
+                <p className="mt-1 text-xs text-red-600">
+                  {shownError("email")}
+                </p>
               )}
             </div>
 
             {/* Password */}
             <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-sm font-medium text-[#333333]"
-              >
+              <label htmlFor="password" className={labelClass}>
                 Password
               </label>
               <div className="relative">
@@ -324,9 +319,10 @@ export default function Page() {
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Enter your password"
-                  className={`${fieldClass(errors.password)} pr-16`}
-                  disabled={RegisterMutation.isPending}
-                  aria-invalid={!!errors.password}
+                  className={`${fieldClass(shownError("password"))} pr-16`}
+                  disabled={pending}
+                  aria-invalid={!!shownError("password")}
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -336,17 +332,32 @@ export default function Page() {
                   {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
-              {errors.password && (
-                <p className="mt-1 text-xs text-red-600">{errors.password}</p>
+
+              {/* Live checklist */}
+              <ul className="mt-2 space-y-1 text-xs" aria-live="polite">
+                {PASSWORD_RULES.map((r) => {
+                  const ok = r.test(formDetail.password);
+                  return (
+                    <li
+                      key={r.label}
+                      className={ok ? "text-emerald-600" : "text-gray-500"}
+                    >
+                      {ok ? "✓" : "○"} {r.label}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {shownError("password") && (
+                <p className="mt-1 text-xs text-red-600">
+                  {shownError("password")}
+                </p>
               )}
             </div>
 
-            {/* Confirmed Password */}
+            {/* Confirm Password */}
             <div>
-              <label
-                htmlFor="confirmedPassword"
-                className="mb-2 block text-sm font-medium text-[#333333]"
-              >
+              <label htmlFor="confirmedPassword" className={labelClass}>
                 Confirm Password
               </label>
               <div className="relative">
@@ -358,9 +369,10 @@ export default function Page() {
                   onChange={handleChange}
                   onBlur={handleBlur}
                   placeholder="Re-enter your password"
-                  className={`${fieldClass(errors.confirmedPassword)} pr-16`}
-                  disabled={RegisterMutation.isPending}
-                  aria-invalid={!!errors.confirmedPassword}
+                  className={`${fieldClass(shownError("confirmedPassword"))} pr-16`}
+                  disabled={pending}
+                  aria-invalid={!!shownError("confirmedPassword")}
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -370,19 +382,16 @@ export default function Page() {
                   {showConfirmPassword ? "Hide" : "Show"}
                 </button>
               </div>
-              {errors.confirmedPassword && (
+              {shownError("confirmedPassword") && (
                 <p className="mt-1 text-xs text-red-600">
-                  {errors.confirmedPassword}
+                  {shownError("confirmedPassword")}
                 </p>
               )}
             </div>
 
             {/* First Name */}
             <div>
-              <label
-                htmlFor="firstName"
-                className="mb-2 block text-sm font-medium text-[#333333]"
-              >
+              <label htmlFor="firstName" className={labelClass}>
                 First Name
               </label>
               <input
@@ -393,21 +402,20 @@ export default function Page() {
                 onChange={handleChange}
                 onBlur={handleBlur}
                 placeholder="Enter your first name"
-                className={fieldClass(errors.firstName)}
-                disabled={RegisterMutation.isPending}
-                aria-invalid={!!errors.firstName}
+                className={fieldClass(shownError("firstName"))}
+                disabled={pending}
+                aria-invalid={!!shownError("firstName")}
               />
-              {errors.firstName && (
-                <p className="mt-1 text-xs text-red-600">{errors.firstName}</p>
+              {shownError("firstName") && (
+                <p className="mt-1 text-xs text-red-600">
+                  {shownError("firstName")}
+                </p>
               )}
             </div>
 
             {/* Last Name */}
             <div>
-              <label
-                htmlFor="lastName"
-                className="mb-2 block text-sm font-medium text-[#333333]"
-              >
+              <label htmlFor="lastName" className={labelClass}>
                 Last Name
               </label>
               <input
@@ -418,21 +426,20 @@ export default function Page() {
                 onChange={handleChange}
                 onBlur={handleBlur}
                 placeholder="Enter your last name"
-                className={fieldClass(errors.lastName)}
-                disabled={RegisterMutation.isPending}
-                aria-invalid={!!errors.lastName}
+                className={fieldClass(shownError("lastName"))}
+                disabled={pending}
+                aria-invalid={!!shownError("lastName")}
               />
-              {errors.lastName && (
-                <p className="mt-1 text-xs text-red-600">{errors.lastName}</p>
+              {shownError("lastName") && (
+                <p className="mt-1 text-xs text-red-600">
+                  {shownError("lastName")}
+                </p>
               )}
             </div>
 
             {/* Gender */}
             <div>
-              <label
-                htmlFor="gender"
-                className="mb-2 block text-sm font-medium text-[#333333]"
-              >
+              <label htmlFor="gender" className={labelClass}>
                 Gender
               </label>
               <select
@@ -441,77 +448,61 @@ export default function Page() {
                 value={formDetail.gender}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className={fieldClass(errors.gender)}
-                disabled={RegisterMutation.isPending}
-                aria-invalid={!!errors.gender}
+                className={fieldClass(shownError("gender"))}
+                disabled={pending}
+                aria-invalid={!!shownError("gender")}
               >
                 <option value="">Select Gender</option>
                 <option value="MALE">MALE</option>
                 <option value="FEMALE">FEMALE</option>
               </select>
-              {errors.gender && (
-                <p className="mt-1 text-xs text-red-600">{errors.gender}</p>
+              {shownError("gender") && (
+                <p className="mt-1 text-xs text-red-600">
+                  {shownError("gender")}
+                </p>
               )}
             </div>
 
+            {/* CNIC */}
             <div>
-              <label
-                htmlFor="cnic"
-                className="mb-2 block text-sm font-medium text-[#333333]"
-              >
+              <label htmlFor="cnic" className={labelClass}>
                 CNIC
               </label>
               <input
                 id="cnic"
                 name="cnic"
                 type="text"
+                inputMode="numeric"
                 value={formatCnic(formDetail.cnic)}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                placeholder="Enter cnic"
-                className={fieldClass(errors.cnic)}
-                disabled={RegisterMutation.isPending}
-                aria-invalid={!!errors.cnic}
+                placeholder="Enter CNIC"
+                className={fieldClass(shownError("cnic"))}
+                disabled={pending}
+                aria-invalid={!!shownError("cnic")}
               />
-              {errors.cnic && (
-                <p className="mt-1 text-xs text-red-600">{errors.cnic}</p>
+              {shownError("cnic") && (
+                <p className="mt-1 text-xs text-red-600">
+                  {shownError("cnic")}
+                </p>
               )}
             </div>
 
-            {/* Register Button */}
-            {/* <button
-              type="submit"
-              disabled={RegisterMutation.isPending}
-              className="w-full rounded-lg bg-[#F5A623] px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-[#D88900] focus:outline-none focus:ring-4 focus:ring-[#F5A623]/20 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {RegisterMutation.isPending
-                ? "Creating account..."
-                : "Create Account"}
-            </button> */}
             <GradientButton
               type="submit"
-              disabled={RegisterMutation.isPending}
+              disabled={pending}
               className="w-full !rounded-lg !px-6 !py-3 !font-semibold"
             >
-              {RegisterMutation.isPending
-                ? "Creating account..."
-                : "Create Account"}
+              {pending ? "Creating account..." : "Create Account"}
             </GradientButton>
           </form>
 
-          {/* Login */}
           <p className="mt-6 text-center text-sm text-gray-500">
             Already have an account?{" "}
-            {/* <a
-              href="/login"
-              className="font-semibold text-[#D88900] hover:text-[#F5A623] hover:underline"
-            >
-              Log In
-            </a> */}
             <button
               type="button"
               onClick={() => router.push(`/login${redirectQuery()}`)}
-              className="font-semibold text-[#D88900] hover:text-[#F5A623] hover:underline cursor-pointer"
+              className="cursor-pointer font-semibold text-[#D88900] hover:text-[#F5A623] hover:underline"
             >
               Log In
             </button>

@@ -79,6 +79,13 @@ const columns: ColumnDef<any, JobRow>[] = [
         >
           Report
         </Link>
+        <a
+          href={`/api/jobs/${row.original.id}/export`}
+          download
+          className="rounded-md border border-[#F0862E]/40 bg-[#F0862E]/5 px-2.5 py-1 text-xs font-semibold text-[#D96F12] transition hover:bg-[#F0862E] hover:text-white"
+        >
+          Export
+        </a>
       </div>
     ),
   },
