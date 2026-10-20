@@ -96,8 +96,8 @@ model Profile {
 }
 
 model Job {
-  id      Int    @id @default(autoincrement())
-  jobCode String @unique @map("job_code") @db.VarChar(50)
+  id      Int     @id @default(autoincrement())
+  jobCode String  @unique @map("job_code") @db.VarChar(50)
   uuid    String? @unique @default(uuid()) @db.VarChar(36)
 
   title               String   @db.VarChar(250)
@@ -237,26 +237,28 @@ model Country {
 }
 
 model Education {
-  id                   Int                @id @default(autoincrement())
-  profileId            Int                @map("profile_id")
-  qualificationGroupId Int
-  qualificationId      Int                @map("qualification_id")
-  institutionId        Int                @map("institution_id")
-  instituteOther       String?            @map("institution_other")
-  majorSubject         String             @map("major_subject")
-  countryId            Int                @map("country_id")
-  divisionGrade        String?            @map("division_grade")
-  cityId               Int?               @map("city_id")
-  cityOther            String?            @map("city_other")
-  passingYear          Int                @map("passing_year")
-  obtainedMarks        Float              @map("obtained_marks")
-  totalMarks           Float              @map("total_marks")
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
-  profile              Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  qualificationGroup   QualificationGroup @relation(fields: [qualificationGroupId], references: [id])
-  qualification        Qualification      @relation(fields: [qualificationId], references: [id])
-  institution          Institution        @relation(fields: [institutionId], references: [id])
+  id                      Int                 @id @default(autoincrement())
+  profileId               Int                 @map("profile_id")
+  qualificationGroupId    Int?
+  qualificationGroupOther String?             @map("qualification_group_other") @db.VarChar(100)
+  qualificationId         Int?                @map("qualification_id")
+  qualificationOther      String?             @map("qualification_other") @db.VarChar(150)
+  institutionId           Int?                @map("institution_id")
+  instituteOther          String?             @map("institution_other")
+  majorSubject            String              @map("major_subject")
+  countryId               Int                 @map("country_id")
+  divisionGrade           String?             @map("division_grade")
+  cityId                  Int?                @map("city_id")
+  cityOther               String?             @map("city_other")
+  passingYear             Int                 @map("passing_year")
+  obtainedMarks           Float               @map("obtained_marks")
+  totalMarks              Float               @map("total_marks")
+  createdAt               DateTime            @default(now()) @map("created_at")
+  updatedAt               DateTime            @updatedAt @map("updated_at")
+  profile                 Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  qualificationGroup      QualificationGroup? @relation(fields: [qualificationGroupId], references: [id])
+  qualification           Qualification?      @relation(fields: [qualificationId], references: [id])
+  institution             Institution?        @relation(fields: [institutionId], references: [id])
 
   @@index([profileId])
   @@index([qualificationGroupId])
@@ -272,6 +274,8 @@ model Certificate {
   organisation    String
   issueDate       DateTime @default(now()) @map("issue_date")
   document        String   @db.VarChar(200)
+  durationUnit    String?  @map("duration_unit")
+  durationValue   Int?     @map("duration_value")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
   profile         Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
@@ -315,8 +319,8 @@ model JobApplication {
   user                   User     @relation(fields: [userId], references: [id])
   jobId                  Int
   job                    Job      @relation(fields: [jobId], references: [id])
-  selectedExperienceIds  Json?     @default("[]")
-  selectedCertificateIds Json?     @default("[]")
+  selectedExperienceIds  Json?    @default("[]")
+  selectedCertificateIds Json?    @default("[]")
   doc1Path               String?
   doc2Path               String?
   cv                     String?

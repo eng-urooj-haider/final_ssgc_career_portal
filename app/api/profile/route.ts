@@ -93,7 +93,7 @@ export async function PATCH(req: NextRequest) {
         alreadyWorkedSsgc: parseSafeBoolean(body.already_worked_ssgc),
         ssgcEmployeeName: body.ssgc_employee_name,
         ssgcEmployeeNumber: body.ssgc_employee_number,
-       isPakistani: parseSafeBoolean(body.is_pakistani),
+        isPakistani: parseSafeBoolean(body.is_pakistani),
       },
     });
     return NextResponse.json({ profile: updated });
@@ -101,6 +101,7 @@ export async function PATCH(req: NextRequest) {
 
   // --- Experience tab ----------------------------------------------------
   if (body.experience) {
+    console.log('bodyrr', body.experience)
     await prisma.$transaction([
       prisma.experience.deleteMany({ where: { profileId: profile.id } }),
       prisma.experience.createMany({
@@ -115,7 +116,7 @@ export async function PATCH(req: NextRequest) {
           salary: e.salary || null,
           responsibility: e.responsibilities || null,
           reasonForLeave: e.reason || null,
-          cityOther: e.cityOther || "",
+          cityOther: e.city_other || "",
         })),
       }),
     ]);
@@ -124,35 +125,72 @@ export async function PATCH(req: NextRequest) {
 
   // --- Education tab -----------------------------------------------------
   if (body.education) {
+    const toIntOrNull = (v: unknown) => {
+      if (v === "other" || v === "" || v == null) return null;
+      const n = Number(v);
+      return Number.isNaN(n) ? null : n;
+    };
+    const textOrNull = (v: unknown) => {
+      const s = typeof v === "string" ? v.trim() : "";
+      return s || null;
+    };
+
+    for (const e of body.education) {
+      if (
+        e.qualification_group_id === "other" &&
+        !textOrNull(e.qualification_group_other)
+      )
+        return NextResponse.json(
+          { error: "Qualification level name required" },
+          { status: 400 },
+        );
+      if (e.qualification_id === "other" && !textOrNull(e.qualification_other))
+        return NextResponse.json(
+          { error: "Degree name required" },
+          { status: 400 },
+        );
+      if (e.institute_id === "other" && !textOrNull(e.institute_other))
+        return NextResponse.json(
+          { error: "Institute name required" },
+          { status: 400 },
+        );
+    }
+
     await prisma.$transaction([
       prisma.education.deleteMany({ where: { profileId: profile.id } }),
       prisma.education.createMany({
-        data: body.education.map((e: any) => ({
-          profileId: profile.id,
-          qualificationGroupId: parseInt(
-            e.qualification_group_id || e.qualificationGroupId,
-          ),
-          qualificationId: parseInt(e.qualification_id || e.qualificationId),
-          institutionId:
-            e.institute_id === "other" || !e.institute_id
+        data: body.education.map((e: any) => {
+          const groupOther = e.qualification_group_id === "other";
+          const qualOther = e.qualification_id === "other";
+          const instOther = e.institute_id === "other";
+          const cityOther = e.city === "other";
+
+          return {
+            profileId: profile.id,
+            qualificationGroupId: groupOther
               ? null
-              : parseInt(e.institute_id),
-          instituteOther:
-            e.institute_id === "other" ? e.institute_other || "" : "",
-          majorSubject: e.major_subject || e.majorSubject || "",
-          countryId: parseInt(e.country_id || e.country || "0"),
-          cityId: e.city === "other" || !e.city ? null : parseInt(e.city),
-          cityOther: e.city_other || e.cityOther || "",
-          passingYear: parseInt(e.passing_year || e.passingYear || "0"),
-          obtainedMarks:
-            parseFloat(e.obtained_marks_gpa || e.obtained_marks || "0") || 0,
-          totalMarks:
-            parseFloat(e.total_marks_gpa || e.total_marks || "0") || 0,
-          divisionGrade: e.division_grade ?? "",
-        })),
+              : toIntOrNull(e.qualification_group_id),
+            qualificationGroupOther: groupOther
+              ? textOrNull(e.qualification_group_other)
+              : null,
+            qualificationId: qualOther ? null : toIntOrNull(e.qualification_id),
+            qualificationOther: qualOther
+              ? textOrNull(e.qualification_other)
+              : null,
+            institutionId: instOther ? null : toIntOrNull(e.institute_id),
+            instituteOther: instOther ? textOrNull(e.institute_other) : null,
+            majorSubject: e.major_subject,
+            countryId: Number(e.country),
+            cityId: cityOther ? null : toIntOrNull(e.city),
+            cityOther: cityOther ? textOrNull(e.city_other) : null,
+            passingYear: Number(e.passing_year),
+            obtainedMarks: Number(e.obtained_marks_gpa),
+            totalMarks: Number(e.total_marks_gpa),
+            divisionGrade: e.division_grade || null,
+          };
+        }),
       }),
     ]);
-
     return NextResponse.json({ ok: true });
   }
 
