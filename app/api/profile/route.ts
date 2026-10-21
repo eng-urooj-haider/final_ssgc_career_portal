@@ -3,7 +3,10 @@ import prisma from "@/app/lib/db";
 import { verifyToken } from "@/app/lib/auth";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
-
+import { saveReferences } from "@/app/lib/validation/refrence";
+import { saveProjects } from "@/app/lib/validation/project";
+import { saveAchievements } from "@/app/lib/validation/achievements";
+import { saveSkills } from "@/app/lib/validation/skill";
 export const runtime = "nodejs";
 
 // ---------------------------------------------------------------------------
@@ -342,7 +345,10 @@ export async function PATCH(req: NextRequest) {
       body = await req.json();
     }
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   // Ensure Profile row exists
@@ -357,7 +363,11 @@ export async function PATCH(req: NextRequest) {
     !body.experience &&
     !body.education &&
     !body.certificates &&
-    !body.memberships
+    !body.memberships &&
+    !body.references &&
+    !body.projects &&
+    !body.achievements &&
+    !body.coreSkills
   ) {
     const updated = await prisma.profile.update({
       where: { id: profile.id },
@@ -507,6 +517,74 @@ export async function PATCH(req: NextRequest) {
       }),
     ]);
     return NextResponse.json({ ok: true });
+  }
+  // --- References tab ----------------------------------------------------
+  if (body.references) {
+    try {
+      const saved = await saveReferences(profile.id, body.references);
+      return NextResponse.json({ ok: true, references: saved });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      console.error("Error saving references:", error);
+      return NextResponse.json(
+        { error: "Failed to update references" },
+        { status: 500 },
+      );
+    }
+  }
+  // --- Projects & Research tab -------------------------------------------
+  if (body.projects) {
+    try {
+      const saved = await saveProjects(profile.id, body.projects);
+      return NextResponse.json({ ok: true, projects: saved });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      console.error("Error saving projects:", error);
+      return NextResponse.json(
+        { error: "Failed to update projects and research" },
+        { status: 500 },
+      );
+    }
+  }
+  // --- Achievements & Awards tab -----------------------------------------
+  if (body.achievements) {
+    console.log(body.achievements);
+    try {
+      const saved = await saveAchievements(profile.id, body.achievements);
+      console.log(saved);
+      return NextResponse.json({ ok: true, achievements: saved });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      console.error("Error saving achievements:", error);
+      return NextResponse.json(
+        { error: "Failed to update achievements and awards" },
+        { status: 500 },
+      );
+    }
+  }
+  // --- Skills & Languages tab --------------------------------------------
+  if (body.coreSkills) {
+    try {
+      const skillsData = body.skills || body;
+      const saved = await saveSkills(profile.id, skillsData);
+      console.log(saved);
+      return NextResponse.json({ ok: true, skills: saved });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      console.error("Error saving skills:", error);
+      return NextResponse.json(
+        { error: "Failed to update skills and languages" },
+        { status: 500 },
+      );
+    }
   }
 
   return NextResponse.json({ error: "Unrecognised payload" }, { status: 400 });

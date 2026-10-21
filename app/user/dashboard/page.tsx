@@ -22,6 +22,10 @@ import {
   Plus,
   Trash2,
   type LucideIcon,
+  Wrench,
+  Trophy,
+  FolderGit2,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,9 +50,20 @@ type TabId =
   | "experience"
   | "education"
   | "certificates"
-  | "memberships";
+  | "memberships"
+  | "skills"
+  | "achievements"
+  | "projects"
+  | "references";
 
-type EntryKey = "experience" | "education" | "certificates" | "memberships";
+type EntryKey =
+  | "experience"
+  | "education"
+  | "certificates"
+  | "memberships"
+  | "achievements"
+  | "projects"
+  | "references";
 
 interface TabDef {
   id: TabId;
@@ -65,6 +80,10 @@ const TABS: TabDef[] = [
   { id: "education", label: "Education", icon: GraduationCap },
   { id: "certificates", label: "Certificates", icon: Award },
   { id: "memberships", label: "Memberships", icon: Users },
+  { id: "skills", label: "Skills", icon: Wrench },
+  { id: "achievements", label: "Achievements", icon: Trophy },
+  { id: "projects", label: "Projects & Research", icon: FolderGit2 },
+  { id: "references", label: "References", icon: BookOpen },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
@@ -74,6 +93,10 @@ const SECTION_LABELS: Record<string, string> = {
   education: "Education",
   certificates: "Certificates",
   memberships: "Memberships",
+  skills: "Technical & Professional skills",
+  achievements: "Achievements & Awards",
+  projects: "Projects & Research",
+  references: "References",
 };
 
 const DELETE_ENDPOINTS: Record<EntryKey, string> = {
@@ -81,6 +104,9 @@ const DELETE_ENDPOINTS: Record<EntryKey, string> = {
   education: "/api/education",
   certificates: "/api/certificate",
   memberships: "/api/memberships",
+  achievements: "/api/achievements",
+  projects: "/api/projects",
+  references: "/api/references",
 };
 
 const ENTRY_LABELS: Record<EntryKey, string> = {
@@ -88,12 +114,13 @@ const ENTRY_LABELS: Record<EntryKey, string> = {
   education: "education",
   certificates: "certificate",
   memberships: "membership",
+  achievements: "achievement",
+  projects: "project",
+  references: "reference",
 };
 
 // ---------------------------------------------------------------------------
 // Temporary ids
-// New (unsaved) rows get NEGATIVE ids so they can never collide with a
-// database id. Saved rows always have a positive id.
 // ---------------------------------------------------------------------------
 
 let tempIdCounter = 0;
@@ -104,10 +131,8 @@ const isSavedId = (id: number) => id > 0;
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-const NAME_REGEX = /^[A-Za-z\s.'-]+$/;
-// Local Pakistani dialing code, e.g. "021" (landline) or "0300" (mobile network).
+const NAME_REGEX = /^[A-Za-z\s.'-]+$ /;
 const PREFIX_REGEX = /^0\d{2,3}$/;
-// 7-digit subscriber number that follows the mobile prefix (e.g. 0300-1234567).
 const MOBILE_REGEX = /^\d{7}$/;
 const LANDLINE_REGEX = /^\d{6,8}$/;
 const YEAR_REGEX = /^(19|20)\d{2}$/;
@@ -124,7 +149,7 @@ function calculateAge(dobString: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// Profile -> form mapping (used once on load, and after saving a section)
+// Profile -> form mapping
 // ---------------------------------------------------------------------------
 
 const toMonthInput = (date: unknown): string => {
@@ -231,6 +256,75 @@ const mapMemberships = (list: any[]): MembershipEntry[] =>
     member_since: m.memberSince ?? "",
   }));
 
+const mapAchievements = (list: any[]): AchievementEntry[] =>
+  list.map((a, i) => ({
+    id: a.id ?? i + 1,
+    title: a.title || "",
+    issuer: a.issuer || "",
+    date_received: a.dateReceived ? String(a.dateReceived).split("T")[0] : "",
+    description: a.description || "",
+  }));
+
+const mapProjects = (list: any[]): ProjectEntry[] =>
+  list.map((p, i) => ({
+    id: p.id ?? i + 1,
+    project_title: p.projectTitle || "",
+    role: p.role || "",
+    project_url: p.projectUrl || "",
+    description: p.description || "",
+  }));
+
+const mapReferences = (list: any[]): ReferenceEntry[] =>
+  list.map((r, i) => ({
+    id: r.id ?? i + 1,
+    name: r.name || "",
+    designation: r.designation || "",
+    organisation: r.organisation || "",
+    email: r.email || "",
+    phone: r.phone || "",
+  }));
+
+export interface SkillsFormData {
+  core_skills: string[];
+  software_tools: string[];
+  languages_known: {
+    language: string;
+    proficiency: "BASIC" | "INTERMEDIATE" | "PROFICIENT" | "NATIVE";
+  }[];
+}
+
+const mapSkills = (p: any): SkillsFormData => {
+  // API returns skills as an array with one row per profile
+  const s = Array.isArray(p?.skills) ? p.skills[0] : p?.skills;
+
+  const toStringArray = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+
+  const rawLanguages = s?.languagesKnown ?? s?.languages_known;
+  const languages: SkillsFormData["languages_known"] = Array.isArray(
+    rawLanguages,
+  )
+    ? rawLanguages
+        .map((l: any) =>
+          typeof l === "string"
+            ? { language: l, proficiency: "INTERMEDIATE" as const }
+            : {
+                language: l?.language ?? "",
+                proficiency: l?.proficiency ?? ("INTERMEDIATE" as const),
+              },
+        )
+        .filter((l) => l.language !== "")
+    : [];
+
+  return {
+    core_skills: toStringArray(s?.coreSkills ?? s?.core_skills),
+    software_tools: toStringArray(s?.softwareTools ?? s?.software_tools),
+    // keep one blank row so the form always has a language input
+    languages_known: languages.length
+      ? languages : []
+      // : [{ language: "", proficiency: "INTERMEDIATE" }],
+  };
+};
 // ---------------------------------------------------------------------------
 // Shared UI primitives
 // ---------------------------------------------------------------------------
@@ -259,7 +353,6 @@ interface FieldProps {
   required?: boolean;
   error?: string;
   className?: string;
-  /** Use "div" when the field contains its own <label> (e.g. file pickers). */
   as?: "label" | "div";
 }
 
@@ -289,7 +382,6 @@ function Field({
   );
 }
 
-// One shared style for every input / select / textarea (no JS focus handlers).
 const controlBase =
   "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition focus:outline-none focus:border-[#1C6FD9] focus:ring-2 focus:ring-[#1C6FD9]/20 disabled:bg-slate-50 disabled:text-slate-500";
 
@@ -330,7 +422,6 @@ interface FormSelectFieldProps
   options: SelectOption[];
   placeholder?: string;
   isLoading?: boolean;
-  /** Appends an "Other" option. Only enable where an "Other" text input exists. */
   allowOther?: boolean;
 }
 
@@ -1267,9 +1358,6 @@ const EducationRow = React.memo(function EducationRow({
   const isGroupOther = entry.qualification_group_id === "other";
   const isQualOther = entry.qualification_id === "other";
 
-  // Note: the typed "Other" text is intentionally NOT cleared when the user
-  // switches to another option, so it is still there if they switch back.
-  // Stale text is stripped from the payload at save time instead.
   return (
     <RepeatableCard
       onRemove={() => onRemove(entry.id)}
@@ -1285,7 +1373,6 @@ const EducationRow = React.memo(function EducationRow({
           onChange={(e) => {
             const v = e.target.value;
             onFieldChange(entry.id, "qualification_group_id", v);
-            // A custom level has no predefined degrees, so degree is "other" too.
             onFieldChange(
               entry.id,
               "qualification_id",
@@ -1551,7 +1638,6 @@ export function EducationTab({
     staleTime: 1000 * 60 * 60,
   });
 
-  // One request shared by every row; each row filters by its own level.
   const { data: qualifications = [], isLoading: isLoadingQualifications } =
     useQuery({
       queryKey: ["qualifications"],
@@ -1745,7 +1831,6 @@ export function CertificatesTab({
                 </div>
               </Field>
 
-              {/* as="div": this field contains its own <label>, and labels cannot nest */}
               <Field
                 as="div"
                 label="Attach Document"
@@ -1905,15 +1990,633 @@ function MembershipsTab({
 }
 
 // ---------------------------------------------------------------------------
+// Achievements & Awards tab
+// ---------------------------------------------------------------------------
+
+interface AchievementEntry {
+  id: number;
+  title: string;
+  issuer: string;
+  date_received: string;
+  description: string;
+}
+
+const emptyAchievement = (id: number): AchievementEntry => ({
+  id,
+  title: "",
+  issuer: "",
+  date_received: "",
+  description: "",
+});
+
+interface AchievementsTabProps {
+  entries: AchievementEntry[];
+  onFieldChange: (
+    id: number,
+    field: keyof AchievementEntry,
+    value: string,
+  ) => void;
+  onAdd: () => void;
+  onRemove: (id: number) => void;
+  errors: Record<string, string>;
+  canAdd?: boolean;
+}
+
+function AchievementsTab({
+  entries,
+  onFieldChange,
+  onAdd,
+  onRemove,
+  errors,
+  canAdd = true,
+}: AchievementsTabProps) {
+  return (
+    <div>
+      <SectionHeading
+        title="Achievements & Awards"
+        description="Highlight notable awards, recognitions, or professional accomplishments."
+      />
+      <div className="space-y-4">
+        {entries.map((entry) => (
+          <RepeatableCard
+            key={entry.id}
+            onRemove={() => onRemove(entry.id)}
+            removeDisabled={entries.length === 1 || !canAdd}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
+              <Field
+                label="Achievement / Award Title"
+                required
+                error={errors[`${entry.id}_title`]}
+              >
+                <FlameInput
+                  value={entry.title || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "title", e.target.value)
+                  }
+                  placeholder="e.g. Employee of the Year"
+                />
+              </Field>
+
+              <Field
+                label="Issuing Organisation / Authority"
+                required
+                error={errors[`${entry.id}_issuer`]}
+              >
+                <FlameInput
+                  value={entry.issuer || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "issuer", e.target.value)
+                  }
+                  placeholder="e.g. Company Management"
+                />
+              </Field>
+
+              <Field
+                label="Date Received"
+                required
+                error={errors[`${entry.id}_date_received`]}
+              >
+                <FlameInput
+                  type="date"
+                  value={entry.date_received || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "date_received", e.target.value)
+                  }
+                />
+              </Field>
+
+              <Field
+                label="Description"
+                className="sm:col-span-2 lg:col-span-3"
+                error={errors[`${entry.id}_description`]}
+              >
+                <FlameTextarea
+                  rows={2}
+                  value={entry.description || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "description", e.target.value)
+                  }
+                  placeholder="Briefly describe what this achievement was awarded for"
+                />
+              </Field>
+            </div>
+          </RepeatableCard>
+        ))}
+      </div>
+      {canAdd && (
+        <div className="mt-4">
+          <AddButton label="Add another achievement" onClick={onAdd} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Projects & Research tab
+// ---------------------------------------------------------------------------
+
+interface ProjectEntry {
+  id: number;
+  project_title: string;
+  role: string;
+  project_url: string;
+  description: string;
+}
+
+const emptyProject = (id: number): ProjectEntry => ({
+  id,
+  project_title: "",
+  role: "",
+  project_url: "",
+  description: "",
+});
+
+interface ProjectsTabProps {
+  entries: ProjectEntry[];
+  onFieldChange: (id: number, field: keyof ProjectEntry, value: string) => void;
+  onAdd: () => void;
+  onRemove: (id: number) => void;
+  errors: Record<string, string>;
+  canAdd?: boolean;
+}
+
+function ProjectsTab({
+  entries,
+  onFieldChange,
+  onAdd,
+  onRemove,
+  errors,
+  canAdd = true,
+}: ProjectsTabProps) {
+  return (
+    <div>
+      <SectionHeading
+        title="Projects & Research"
+        description="Showcase key technical projects, applications, or academic research studies."
+      />
+      <div className="space-y-4">
+        {entries.map((entry) => (
+          <RepeatableCard
+            key={entry.id}
+            onRemove={() => onRemove(entry.id)}
+            removeDisabled={entries.length === 1 || !canAdd}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
+              <Field
+                label="Project / Research Title"
+                required
+                error={errors[`${entry.id}_project_title`]}
+              >
+                <FlameInput
+                  value={entry.project_title || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "project_title", e.target.value)
+                  }
+                  placeholder="e.g. Pipeline Monitoring IoT System"
+                />
+              </Field>
+
+              {/* <Field
+                label="Your Role"
+                required
+                error={errors[`${entry.id}_role`]}
+              >
+                <FlameInput
+                  value={entry.role || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "role", e.target.value)
+                  }
+                  placeholder="e.g. Lead Developer / Researcher"
+                />
+              </Field> */}
+
+              {/* <Field
+                label="Project Link / Repository (optional)"
+                error={errors[`${entry.id}_project_url`]}
+              >
+                <FlameInput
+                  value={entry.project_url || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "project_url", e.target.value)
+                  }
+                  placeholder="https://github.com/..."
+                />
+              </Field> */}
+
+              <Field
+                label="Description & Key Contributions"
+                required
+                className="sm:col-span-2 lg:col-span-3"
+                error={errors[`${entry.id}_description`]}
+              >
+                <FlameTextarea
+                  rows={3}
+                  value={entry.description || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "description", e.target.value)
+                  }
+                  placeholder="Describe the objective, technologies used, and outcomes"
+                />
+              </Field>
+            </div>
+          </RepeatableCard>
+        ))}
+      </div>
+      {canAdd && (
+        <div className="mt-4">
+          <AddButton label="Add another project" onClick={onAdd} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// References tab
+// ---------------------------------------------------------------------------
+
+interface ReferenceEntry {
+  id: number;
+  name: string;
+  designation: string;
+  organisation: string;
+  // email: string;
+  phone: string;
+}
+
+const emptyReference = (id: number): ReferenceEntry => ({
+  id,
+  name: "",
+  designation: "",
+  organisation: "",
+  // email: "",
+  phone: "",
+});
+
+interface ReferencesTabProps {
+  entries: ReferenceEntry[];
+  onFieldChange: (
+    id: number,
+    field: keyof ReferenceEntry,
+    value: string,
+  ) => void;
+  onAdd: () => void;
+  onRemove: (id: number) => void;
+  errors: Record<string, string>;
+  canAdd?: boolean;
+}
+
+function ReferencesTab({
+  entries,
+  onFieldChange,
+  onAdd,
+  onRemove,
+  errors,
+  canAdd = true,
+}: ReferencesTabProps) {
+  return (
+    <div>
+      <SectionHeading
+        title="Professional References"
+        description="Provide professional references who can vouch for your work history."
+      />
+      <div className="space-y-4">
+        {entries.map((entry) => (
+          <RepeatableCard
+            key={entry.id}
+            onRemove={() => onRemove(entry.id)}
+            removeDisabled={entries.length === 1 || !canAdd}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 pr-8">
+              <Field
+                label="Referee Name"
+                required
+                error={errors[`${entry.id}_name`]}
+              >
+                <FlameInput
+                  value={entry.name || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "name", e.target.value)
+                  }
+                  placeholder="e.g. Dr. Ahmed Khan"
+                />
+              </Field>
+
+              <Field
+                label="Designation"
+                required
+                error={errors[`${entry.id}_designation`]}
+              >
+                <FlameInput
+                  value={entry.designation || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "designation", e.target.value)
+                  }
+                  placeholder="e.g. General Manager"
+                />
+              </Field>
+
+              <Field
+                label="Organisation"
+                required
+                error={errors[`${entry.id}_organisation`]}
+              >
+                <FlameInput
+                  value={entry.organisation || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "organisation", e.target.value)
+                  }
+                  placeholder="e.g. ABC Corporation"
+                />
+              </Field>
+
+              {/* <Field
+                label="Email Address"
+                required
+                error={errors[`${entry.id}_email`]}
+              >
+                <FlameInput
+                  type="email"
+                  value={entry.email || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "email", e.target.value)
+                  }
+                  placeholder="ahmed.khan@example.com"
+                />
+              </Field> */}
+
+              <Field
+                label="Phone Number"
+                required
+                error={errors[`${entry.id}_phone`]}
+              >
+                <FlameInput
+                  type="tel"
+                  value={entry.phone || ""}
+                  onChange={(e) =>
+                    onFieldChange(entry.id, "phone", e.target.value)
+                  }
+                  placeholder="03001234567"
+                />
+              </Field>
+            </div>
+          </RepeatableCard>
+        ))}
+      </div>
+      {canAdd && (
+        <div className="mt-4">
+          <AddButton label="Add another reference" onClick={onAdd} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Skills Tab Component
+// ---------------------------------------------------------------------------
+
+interface SkillsTabProps {
+  data: SkillsFormData;
+  onChange: (newData: SkillsFormData) => void;
+  errors: Record<string, string>;
+}
+
+function SkillsTab({ data, onChange, errors }: SkillsTabProps) {
+  const [coreInput, setCoreInput] = useState("");
+  const [toolInput, setToolInput] = useState("");
+
+  const addCoreSkill = () => {
+    const trimmed = coreInput.trim();
+    if (trimmed && !data.core_skills.includes(trimmed)) {
+      onChange({ ...data, core_skills: [...data.core_skills, trimmed] });
+      setCoreInput("");
+    }
+  };
+
+  const removeCoreSkill = (skillToRemove: string) => {
+    onChange({
+      ...data,
+      core_skills: data.core_skills.filter((s) => s !== skillToRemove),
+    });
+  };
+
+  const addSoftwareTool = () => {
+    const trimmed = toolInput.trim();
+    if (trimmed && !data.software_tools.includes(trimmed)) {
+      onChange({ ...data, software_tools: [...data.software_tools, trimmed] });
+      setToolInput("");
+    }
+  };
+
+  const removeSoftwareTool = (toolToRemove: string) => {
+    onChange({
+      ...data,
+      software_tools: data.software_tools.filter((t) => t !== toolToRemove),
+    });
+  };
+
+  const addLanguage = () => {
+    onChange({
+      ...data,
+      languages_known: [
+        ...data.languages_known,
+        { language: "", proficiency: "INTERMEDIATE" },
+      ],
+    });
+  };
+
+  const updateLanguage = (
+    index: number,
+    field: "language" | "proficiency",
+    value: string,
+  ) => {
+    const updated = [...data.languages_known];
+    updated[index] = { ...updated[index], [field]: value };
+    onChange({ ...data, languages_known: updated });
+  };
+
+  const removeLanguage = (index: number) => {
+    onChange({
+      ...data,
+      languages_known: data.languages_known.filter((_, i) => i !== index),
+    });
+  };
+
+  return (
+    <div>
+      <SectionHeading
+        title="Technical & Professional Skills"
+        description="Highlight your core competencies, software tools, and language proficiencies."
+      />
+
+      <div className="space-y-8">
+        <div>
+          <Field
+            label="Core Professional Skills"
+            required
+            error={errors.core_skills}
+          >
+            <div className="flex gap-2 mb-3">
+              <FlameInput
+                value={coreInput}
+                onChange={(e) => setCoreInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCoreSkill();
+                  }
+                }}
+                placeholder="e.g. Project Management, Financial Analysis, React.js (Press Enter)"
+              />
+              <button
+                type="button"
+                onClick={addCoreSkill}
+                className="px-4 py-2 rounded-md font-medium text-white text-sm shrink-0 transition-opacity hover:opacity-90"
+                style={{ background: flameGradient }}
+              >
+                Add Skill
+              </button>
+            </div>
+          </Field>
+
+          <div className="flex flex-wrap gap-2">
+            {data.core_skills.map((skill) => (
+              <span
+                key={skill}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200"
+              >
+                {skill}
+                <button
+                  type="button"
+                  onClick={() => removeCoreSkill(skill)}
+                  className="hover:text-red-500 transition-colors ml-1"
+                >
+                  &times;
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <Field
+            label="Software & Tools"
+            required
+            error={errors.software_tools}
+          >
+            <div className="flex gap-2 mb-3">
+              <FlameInput
+                value={toolInput}
+                onChange={(e) => setToolInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addSoftwareTool();
+                  }
+                }}
+                placeholder="e.g. SAP ERP, MS Excel, AutoCAD, Git (Press Enter)"
+              />
+              <button
+                type="button"
+                onClick={addSoftwareTool}
+                className="px-4 py-2 rounded-md font-medium text-white text-sm shrink-0 transition-opacity hover:opacity-90"
+                style={{ background: flameGradient }}
+              >
+                Add Tool
+              </button>
+            </div>
+          </Field>
+
+          <div className="flex flex-wrap gap-2">
+            {data.software_tools.map((tool) => (
+              <span
+                key={tool}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200"
+              >
+                {tool}
+                <button
+                  type="button"
+                  onClick={() => removeSoftwareTool(tool)}
+                  className="hover:text-red-500 transition-colors ml-1"
+                >
+                  &times;
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-3 flex justify-between items-center">
+            <span className="block text-sm font-semibold text-slate-800">
+              Languages Known <span style={{ color: flame.edge }}>*</span>
+            </span>
+            <AddButton onClick={addLanguage} label="Add Language" />
+          </div>
+
+          {errors.languages_known && (
+            <p className="text-xs text-red-500 mb-3">
+              {errors.languages_known}
+            </p>
+          )}
+
+          <div className="space-y-3">
+            {data.languages_known.map((lang, index) => (
+              <RepeatableCard
+                key={index}
+                onRemove={() => removeLanguage(index)}
+                removeDisabled={data.languages_known.length === 1}
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pr-8">
+                  <Field label="Language" required>
+                    <FlameInput
+                      value={lang.language}
+                      onChange={(e) =>
+                        updateLanguage(index, "language", e.target.value)
+                      }
+                      placeholder="e.g. English, Urdu, Sindhi"
+                    />
+                  </Field>
+
+                  {/* <Field label="Proficiency Level" required>
+                    <FlameSelect
+                      value={lang.proficiency}
+                      onChange={(e) =>
+                        updateLanguage(index, "proficiency", e.target.value)
+                      }
+                    >
+                      <option value="BASIC">Basic</option>
+                      <option value="INTERMEDIATE">Intermediate</option>
+                      <option value="PROFICIENT">Proficient</option>
+                      <option value="NATIVE">Native / Fluent</option>
+                    </FlameSelect>
+                  </Field> */}
+                </div>
+              </RepeatableCard>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root component
 // ---------------------------------------------------------------------------
 
-interface ProfileFormData extends PersonalFormData {
+interface ProfileFormData extends PersonalFormData, SkillsFormData {
   image: File | string;
   experience: ExperienceEntry[];
   education: EducationEntry[];
   certificates: CertificateEntry[];
   memberships: MembershipEntry[];
+  achievements: AchievementEntry[];
+  projects: ProjectEntry[];
+  references: ReferenceEntry[];
 }
 
 const initialFormData: ProfileFormData = {
@@ -1939,10 +2642,16 @@ const initialFormData: ProfileFormData = {
   ssgc_employee_name: "",
   ssgc_employee_number: "",
   is_pakistani: "",
+  core_skills: [],
+  software_tools: [],
+  languages_known: [{ language: "", proficiency: "INTERMEDIATE" }],
   experience: [emptyExperience(nextTempId())],
   education: [emptyEducation(nextTempId())],
   certificates: [emptyCertificate(nextTempId())],
   memberships: [emptyMembership(nextTempId())],
+  achievements: [emptyAchievement(nextTempId())],
+  projects: [emptyProject(nextTempId())],
+  references: [emptyReference(nextTempId())],
 };
 
 const DIGITS_ONLY_FIELDS = new Set([
@@ -1963,11 +2672,6 @@ function sanitizeValue(name: string, value: string): string {
   return value;
 }
 
-// ---------------------------------------------------------------------------
-// Payload cleaners: "Other" text is only sent when "Other" is selected, so
-// stale text kept in the form state is never saved.
-// ---------------------------------------------------------------------------
-
 const trimmed = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
 function cleanPersonal(d: ProfileFormData) {
@@ -1977,6 +2681,12 @@ function cleanPersonal(d: ProfileFormData) {
     education,
     certificates,
     memberships,
+    achievements,
+    projects,
+    references,
+    core_skills,
+    software_tools,
+    languages_known,
     ...personal
   } = d;
   const worked = personal.already_worked_ssgc === "Yes";
@@ -2042,11 +2752,6 @@ function formatDeadline(deadline: unknown): string {
 
 type PendingDelete = { key: EntryKey; id: number } | null;
 
-/**
- * Stable add / change / remove handlers for one repeatable section.
- * Because the callbacks are memoised, memoised rows only re-render when
- * their own entry changes.
- */
 function useEntryHandlers(
   key: EntryKey,
   makeEmpty: (id: number) => any,
@@ -2095,8 +2800,6 @@ function ProfileTabsContent() {
   const { data: profile } = useUserProfile();
   const { jobId, job, exists, isLoading } = useFindingId();
 
-  // Load the saved profile into the form ONCE. Switching tabs never touches
-  // formData, so unsaved edits survive tab changes and background refetches.
   const initialized = useRef(false);
   useEffect(() => {
     if (!profile || initialized.current) return;
@@ -2104,6 +2807,7 @@ function ProfileTabsContent() {
     setFormData((prev) => ({
       ...prev,
       ...mapPersonal(profile),
+      ...mapSkills(profile),
       experience: profile.experiences?.length
         ? mapExperience(profile.experiences)
         : prev.experience,
@@ -2116,10 +2820,18 @@ function ProfileTabsContent() {
       memberships: profile.memberships?.length
         ? mapMemberships(profile.memberships)
         : prev.memberships,
+      achievements: profile.achievements?.length
+        ? mapAchievements(profile.achievements)
+        : prev.achievements,
+      projects: profile.projects?.length
+        ? mapProjects(profile.projects)
+        : prev.projects,
+      references: profile.references?.length
+        ? mapReferences(profile.references)
+        : prev.references,
     }));
   }, [profile]);
 
-  // Keep the active tab visible in the horizontally scrolling tab bar (mobile).
   useEffect(() => {
     tabRefs.current[activeTab]?.scrollIntoView({
       inline: "center",
@@ -2128,12 +2840,13 @@ function ProfileTabsContent() {
     });
   }, [activeTab]);
 
-  // After saving a tab, refresh only that section (ids change on save).
   function syncSection(tab: TabId, p: any) {
     setFormData((prev) => {
       switch (tab) {
         case "personal":
           return { ...prev, ...mapPersonal(p) };
+        case "skills":
+          return { ...prev, ...mapSkills(p) };
         case "experience":
           return p.experiences?.length
             ? { ...prev, experience: mapExperience(p.experiences) }
@@ -2149,6 +2862,18 @@ function ProfileTabsContent() {
         case "memberships":
           return p.memberships?.length
             ? { ...prev, memberships: mapMemberships(p.memberships) }
+            : prev;
+        case "achievements":
+          return p.achievements?.length
+            ? { ...prev, achievements: mapAchievements(p.achievements) }
+            : prev;
+        case "projects":
+          return p.projects?.length
+            ? { ...prev, projects: mapProjects(p.projects) }
+            : prev;
+        case "references":
+          return p.references?.length
+            ? { ...prev, references: mapReferences(p.references) }
             : prev;
         default:
           return prev;
@@ -2170,7 +2895,6 @@ function ProfileTabsContent() {
     [job, profile],
   );
 
-  // All hooks stay above the early returns below.
   const experienceHandlers = useEntryHandlers(
     "experience",
     emptyExperience,
@@ -2199,6 +2923,27 @@ function ProfileTabsContent() {
     setErrors,
     setPendingDelete,
   );
+  const achievementsHandlers = useEntryHandlers(
+    "achievements",
+    emptyAchievement,
+    setFormData,
+    setErrors,
+    setPendingDelete,
+  );
+  const projectsHandlers = useEntryHandlers(
+    "projects",
+    emptyProject,
+    setFormData,
+    setErrors,
+    setPendingDelete,
+  );
+  const referencesHandlers = useEntryHandlers(
+    "references",
+    emptyReference,
+    setFormData,
+    setErrors,
+    setPendingDelete,
+  );
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -2211,7 +2956,6 @@ function ProfileTabsContent() {
 
     setDeleting(true);
     try {
-      // Only saved rows exist on the server (unsaved rows have negative ids).
       if (isSavedId(id)) {
         await api.delete(`${DELETE_ENDPOINTS[key]}/${id}`);
         queryClient.invalidateQueries({ queryKey: ["profile_data"] });
@@ -2226,7 +2970,7 @@ function ProfileTabsContent() {
       toast.success(`${ENTRY_LABELS[key]} removed`);
       setPendingDelete(null);
     } catch (err) {
-      if ((err as any)?.response?.status === 401) return; // interceptor redirects
+      if ((err as any)?.response?.status === 401) return;
       toast.error("Could not delete. Please try again.");
     } finally {
       setDeleting(false);
@@ -2243,6 +2987,18 @@ function ProfileTabsContent() {
       const hasSavedPhoto = Boolean(profile?.userPic);
       if (!hasNewFile && !hasSavedPhoto) {
         newErrors.image = "Image is required";
+      }
+    }
+
+    if (activeTab === "skills") {
+      if (!formData.core_skills || formData.core_skills.length === 0) {
+        newErrors.core_skills = "At least one core skill is required";
+      }
+      if (!formData.software_tools || formData.software_tools.length === 0) {
+        newErrors.software_tools = "At least one software/tool is required";
+      }
+      if (!formData.languages_known || formData.languages_known.length === 0) {
+        newErrors.languages_known = "At least one language is required";
       }
     }
 
@@ -2312,36 +3068,6 @@ function ProfileTabsContent() {
         newErrors.mobile_number = "Enter a valid 7-digit mobile number";
       }
 
-      const homePrefix = formData.home_prefix?.trim() || "";
-      const homeNumber = formData.home_number?.trim() || "";
-      if (homePrefix || homeNumber) {
-        if (!homePrefix) {
-          newErrors.home_prefix = "Area code is required";
-        } else if (!PREFIX_REGEX.test(homePrefix)) {
-          newErrors.home_prefix = "Use format 021";
-        }
-        if (!homeNumber) {
-          newErrors.home_number = "Home phone number is required";
-        } else if (!LANDLINE_REGEX.test(homeNumber)) {
-          newErrors.home_number = "Enter a valid phone number";
-        }
-      }
-
-      const officePrefix = formData.office_prefix?.trim() || "";
-      const officeNumber = formData.office_number?.trim() || "";
-      if (officePrefix || officeNumber) {
-        if (!officePrefix) {
-          newErrors.office_prefix = "Area code is required";
-        } else if (!PREFIX_REGEX.test(officePrefix)) {
-          newErrors.office_prefix = "Use format 021";
-        }
-        if (!officeNumber) {
-          newErrors.office_number = "Office phone number is required";
-        } else if (!LANDLINE_REGEX.test(officeNumber)) {
-          newErrors.office_number = "Enter a valid phone number";
-        }
-      }
-
       const currentAddress = formData.current_address?.trim() || "";
       if (!currentAddress) {
         newErrors.current_address = "Current address is required";
@@ -2385,14 +3111,6 @@ function ProfileTabsContent() {
         if (!entry.end_date) {
           newErrors[`${entry.id}_end_date`] = "End date is required";
         }
-        if (
-          entry.start_date &&
-          entry.end_date &&
-          entry.end_date < entry.start_date
-        ) {
-          newErrors[`${entry.id}_end_date`] =
-            "End date can't be before the start date";
-        }
         if (!entry.country) {
           newErrors[`${entry.id}_country`] = "Country is required";
         }
@@ -2409,97 +3127,36 @@ function ProfileTabsContent() {
         if (!entry.reason.trim()) {
           newErrors[`${entry.id}_reason`] = "Reason is required";
         }
-        if (entry.city === "other" && !entry.city_other?.trim()) {
-          newErrors[`${entry.id}_city_other`] =
-            "Please specify your experience city";
-        }
       });
     }
 
     if (activeTab === "education") {
-      const currentYear = new Date().getFullYear();
-
       formData.education.forEach((entry) => {
         const p = `${entry.id}_`;
-
-        const group = str(entry.qualification_group_id);
-        if (!group) {
+        if (!str(entry.qualification_group_id)) {
           newErrors[`${p}qualification_group_id`] =
             "Qualification level is required";
-        } else if (group === "other" && !str(entry.qualification_group_other)) {
-          newErrors[`${p}qualification_group_other`] =
-            "Please specify qualification level";
         }
-
-        const qual = str(entry.qualification_id);
-        if (!qual) {
+        if (!str(entry.qualification_id)) {
           newErrors[`${p}qualification_id`] =
             "Degree/Qualification is required";
-        } else if (qual === "other" && !str(entry.qualification_other)) {
-          newErrors[`${p}qualification_other`] = "Please specify degree name";
         }
-
-        const institute = str(entry.institute_id);
-        if (!institute) {
+        if (!str(entry.institute_id)) {
           newErrors[`${p}institute_id`] = "Institute or Board is required";
-        } else if (institute === "other" && !str(entry.institute_other)) {
-          newErrors[`${p}institute_other`] = "Please specify institute name";
         }
-
         if (!str(entry.major_subject)) {
-          newErrors[`${p}major_subject`] =
-            "Major subject / Specialization is required";
+          newErrors[`${p}major_subject`] = "Major subject is required";
         }
-        if (!str(entry.country)) {
-          newErrors[`${p}country`] = "Country is required";
-        }
-        if (!str(entry.city)) {
-          newErrors[`${p}city`] = "City is required";
-        } else if (str(entry.city) === "other" && !str(entry.city_other)) {
-          newErrors[`${p}city_other`] = "Please specify your city";
-        }
-
-        const year = str(entry.passing_year);
-        if (!year) {
+        if (!str(entry.passing_year)) {
           newErrors[`${p}passing_year`] = "Passing year is required";
-        } else if (!YEAR_REGEX.test(year)) {
-          newErrors[`${p}passing_year`] = "Enter a valid 4-digit year";
-        } else {
-          const y = parseInt(year, 10);
-          if (y < 1950 || y > currentYear) {
-            newErrors[`${p}passing_year`] =
-              `Year must be between 1950 and ${currentYear}`;
-          }
         }
-
-        const obtainedStr = str(entry.obtained_marks_gpa);
-        const obtainedNum = parseFloat(obtainedStr);
-        if (!obtainedStr) {
+        if (!str(entry.obtained_marks_gpa)) {
           newErrors[`${p}obtained_marks_gpa`] =
             "Obtained marks/CGPA is required";
-        } else if (isNaN(obtainedNum) || obtainedNum < 0) {
-          newErrors[`${p}obtained_marks_gpa`] = "Enter a valid positive number";
         }
-
-        const totalStr = str(entry.total_marks_gpa);
-        const totalNum = parseFloat(totalStr);
-        if (!totalStr) {
+        if (!str(entry.total_marks_gpa)) {
           newErrors[`${p}total_marks_gpa`] = "Total marks/CGPA is required";
-        } else if (isNaN(totalNum) || totalNum <= 0) {
-          newErrors[`${p}total_marks_gpa`] =
-            "Total marks/CGPA must be greater than 0";
         }
-
-        if (
-          !isNaN(obtainedNum) &&
-          !isNaN(totalNum) &&
-          obtainedNum >= 0 &&
-          totalNum > 0 &&
-          obtainedNum > totalNum
-        ) {
-          newErrors[`${p}obtained_marks_gpa`] = "Obtained cannot exceed total";
-        }
-
         if (!str(entry.division_grade)) {
           newErrors[`${p}division_grade`] = "Division / Grade is required";
         }
@@ -2539,6 +3196,54 @@ function ProfileTabsContent() {
       });
     }
 
+    if (activeTab === "achievements") {
+      formData.achievements.forEach((entry) => {
+        if (!entry.title.trim()) {
+          newErrors[`${entry.id}_title`] = "Title is required";
+        }
+        if (!entry.issuer.trim()) {
+          newErrors[`${entry.id}_issuer`] = "Issuer is required";
+        }
+        if (!entry.date_received) {
+          newErrors[`${entry.id}_date_received`] = "Date received is required";
+        }
+      });
+    }
+
+    if (activeTab === "projects") {
+      formData.projects.forEach((entry) => {
+        if (!entry.project_title.trim()) {
+          newErrors[`${entry.id}_project_title`] = "Project title is required";
+        }
+        // if (!entry.role.trim()) {
+        //   newErrors[`${entry.id}_role`] = "Role is required";
+        // }
+        if (!entry.description.trim()) {
+          newErrors[`${entry.id}_description`] = "Description is required";
+        }
+      });
+    }
+
+    if (activeTab === "references") {
+      formData.references.forEach((entry) => {
+        if (!entry.name.trim()) {
+          newErrors[`${entry.id}_name`] = "Referee name is required";
+        }
+        if (!entry.designation.trim()) {
+          newErrors[`${entry.id}_designation`] = "Designation is required";
+        }
+        if (!entry.organisation.trim()) {
+          newErrors[`${entry.id}_organisation`] = "Organisation is required";
+        }
+        // if (!entry.email.trim()) {
+        //   newErrors[`${entry.id}_email`] = "Email address is required";
+        // }
+        if (!entry.phone.trim()) {
+          newErrors[`${entry.id}_phone`] = "Phone number is required";
+        }
+      });
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
@@ -2548,22 +3253,11 @@ function ProfileTabsContent() {
   ) {
     const { name } = e.target;
     const value = sanitizeValue(name, e.target.value);
-
-    // Dependent "Other" / SSGC text is kept (not cleared) when the selection
-    // changes; cleanPersonal() strips it from the payload at save time.
     setFormData((prev) => ({ ...prev, [name]: value }));
-
     setErrors((prev) => {
-      const dependentKeys =
-        name === "already_worked_ssgc"
-          ? ["ssgc_employee_name", "ssgc_employee_number"]
-          : name === "birth_city"
-            ? ["birth_city_other"]
-            : [];
-      const keysToClear = [name, ...dependentKeys].filter((k) => prev[k]);
-      if (keysToClear.length === 0) return prev;
+      if (!prev[name]) return prev;
       const updated = { ...prev };
-      keysToClear.forEach((k) => delete updated[k]);
+      delete updated[name];
       return updated;
     });
   }
@@ -2601,6 +3295,14 @@ function ProfileTabsContent() {
 
         case "personal":
           await api.patch("/api/profile", cleanPersonal(formData));
+          break;
+
+        case "skills":
+          await api.patch("/api/profile", {
+            coreSkills: formData.core_skills,
+            softwareTools: formData.software_tools,
+            languagesKnown: formData.languages_known,
+          });
           break;
 
         case "experience":
@@ -2644,6 +3346,24 @@ function ProfileTabsContent() {
           });
           break;
 
+        case "achievements":
+          await api.patch("/api/profile", {
+            achievements: formData.achievements,
+          });
+          break;
+
+        case "projects":
+          await api.patch("/api/profile", {
+            projects: formData.projects,
+          });
+          break;
+
+        case "references":
+          await api.patch("/api/profile", {
+            references: formData.references,
+          });
+          break;
+
         default:
           break;
       }
@@ -2654,7 +3374,7 @@ function ProfileTabsContent() {
 
       toast.success(`${label} saved successfully`);
     } catch (err) {
-      if ((err as any)?.response?.status === 401) return; // interceptor redirects
+      if ((err as any)?.response?.status === 401) return;
       toast.error(`Could not save ${label.toLowerCase()}`);
       setSubmitError("Something went wrong while saving");
     } finally {
@@ -2708,7 +3428,9 @@ function ProfileTabsContent() {
     >
       <ConfirmDialog
         open={pendingDelete !== null}
-        title={`Delete this ${pendingDelete ? ENTRY_LABELS[pendingDelete.key] : "entry"}?`}
+        title={`Delete this ${
+          pendingDelete ? ENTRY_LABELS[pendingDelete.key] : "entry"
+        }?`}
         message="This action cannot be undone."
         loading={deleting}
         onConfirm={confirmDelete}
@@ -2728,73 +3450,6 @@ function ProfileTabsContent() {
         <ProgressBar progress={progressPercentage} />
       )}
 
-      {jobId && exists && progressPercentage === 100 && (
-        <div className="max-w-7xl mx-auto mb-6">
-          <div
-            className="bg-white rounded-xl p-6 overflow-x-auto"
-            style={{ border: "1px solid #E7E5E1" }}
-          >
-            <p
-              className="text-sm font-semibold mb-4"
-              style={{ color: flame.ink }}
-            >
-              {alreadyApplied
-                ? "You have applied for the following job position:"
-                : "You are applying for the following job position:"}
-            </p>
-            <table className="w-full text-sm text-left border border-slate-200 rounded-md overflow-hidden">
-              <thead style={{ background: "#F8FAFC" }}>
-                <tr>
-                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
-                    Job Code
-                  </th>
-                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
-                    Job Title
-                  </th>
-                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
-                    Deadline
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
-                    {job?.jobCode ?? "-"}
-                  </td>
-                  <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
-                    {job?.title ?? "-"}
-                  </td>
-                  <td className="px-4 py-2 border-b border-slate-100 text-slate-600">
-                    {formatDeadline(job?.deadline)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {!alreadyApplied && (
-            <p className="mt-3 text-slate-700">
-              Note: Please review your resume details below before confirming
-              your job application.
-            </p>
-          )}
-
-          {alreadyApplied ? (
-            <p className="mt-3 inline-block rounded-md bg-green-50 px-4 py-2 text-sm font-medium text-green-700">
-              You have already applied for this position.
-            </p>
-          ) : (
-            <Link
-              href={`/jobs/${job?.uuid}/apply/confirm`}
-              className="mt-3 inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-              style={{ background: flameGradient }}
-            >
-              Confirm Your Job Application
-            </Link>
-          )}
-        </div>
-      )}
-
       <div className="max-w-7xl mx-auto">
         <div
           className="bg-white rounded-xl overflow-hidden"
@@ -2806,15 +3461,15 @@ function ProfileTabsContent() {
           <div className="h-1" style={{ background: flameGradient }} />
 
           <div
-            className="border-b overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="border-b bg-slate-50/80 p-3 sm:p-4"
             style={{ borderColor: "#E7E5E1" }}
           >
             <nav
-              className="flex min-w-max gap-1 px-2"
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-2.5"
               role="tablist"
               aria-label="Profile sections"
             >
-              {TABS.map((tab, index) => {
+              {TABS.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeTab;
                 return (
@@ -2830,22 +3485,25 @@ function ProfileTabsContent() {
                     aria-controls={`panel-${tab.id}`}
                     disabled={saving}
                     onClick={() => setActiveTab(tab.id)}
-                    className="relative flex items-center gap-2 px-5 py-3.5 mt-1.5 rounded-t-md text-sm whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C6FD9]/40 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-                    style={{
-                      color: isActive ? flame.core : "#334155",
-                      fontWeight: isActive ? 700 : 600,
-                      background: isActive ? "#F8FAFC" : "transparent",
-                      borderRight:
-                        index !== TABS.length - 1
-                          ? "1px solid #E2E8F0"
-                          : "none",
-                    }}
+                    className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs sm:text-sm transition-all duration-150 cursor-pointer text-left border ${
+                      isActive
+                        ? "bg-white text-blue-600 font-semibold shadow-sm border-slate-300/80"
+                        : "bg-slate-100/70 text-slate-600 hover:bg-white hover:text-slate-900 border-slate-200/60 hover:border-slate-300/80"
+                    }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    {tab.label}
+                    <Icon
+                      className={`w-4 h-4 shrink-0 transition-colors ${
+                        isActive
+                          ? "text-blue-600"
+                          : "text-slate-400 group-hover:text-slate-600"
+                      }`}
+                    />
+                    <span className="truncate">{tab.label}</span>
+
+                    {/* Flame Accent Bar on Active Tab */}
                     {isActive && (
                       <span
-                        className="absolute left-0 right-0 -bottom-px h-0.5"
+                        className="absolute bottom-0 left-2 right-2 h-0.5 rounded-t-full"
                         style={{ background: flameGradient }}
                       />
                     )}
@@ -2873,6 +3531,19 @@ function ProfileTabsContent() {
               <PersonalTab
                 formData={formData}
                 onChange={handleChange}
+                errors={errors}
+              />
+            )}
+            {activeTab === "skills" && (
+              <SkillsTab
+                data={{
+                  core_skills: formData.core_skills,
+                  software_tools: formData.software_tools,
+                  languages_known: formData.languages_known,
+                }}
+                onChange={(newData) =>
+                  setFormData((prev) => ({ ...prev, ...newData }))
+                }
                 errors={errors}
               />
             )}
@@ -2906,6 +3577,30 @@ function ProfileTabsContent() {
                 errors={errors}
                 canAdd={!alreadyApplied}
                 {...membershipsHandlers}
+              />
+            )}
+            {activeTab === "achievements" && (
+              <AchievementsTab
+                entries={formData.achievements}
+                errors={errors}
+                canAdd={!alreadyApplied}
+                {...achievementsHandlers}
+              />
+            )}
+            {activeTab === "projects" && (
+              <ProjectsTab
+                entries={formData.projects}
+                errors={errors}
+                canAdd={!alreadyApplied}
+                {...projectsHandlers}
+              />
+            )}
+            {activeTab === "references" && (
+              <ReferencesTab
+                entries={formData.references}
+                errors={errors}
+                canAdd={!alreadyApplied}
+                {...referencesHandlers}
               />
             )}
           </div>

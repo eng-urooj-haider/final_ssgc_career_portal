@@ -41,6 +41,13 @@ export async function GET(req: NextRequest) {
         memberships: {
           orderBy: { memberSince: "desc" },
         },
+        references: true,
+        skills: true,
+        achievements:true,
+        projects:true,
+        // {
+        //   orderBy: { createAt: "desc" },
+        // },
         certificates: {},
       },
     });

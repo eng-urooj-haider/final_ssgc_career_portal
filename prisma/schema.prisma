@@ -91,6 +91,10 @@ model Profile {
   education            Education[]
   certificates         Certificate[]
   memberships          Membership[]
+  skills               Skill[]
+  achievements         Achievement[]
+  projects             Project[]
+  references           Reference[]
 
   @@map("profiles")
 }
@@ -329,4 +333,57 @@ model JobApplication {
 
   @@unique([userId, jobId])
   @@map("job_applications")
+}
+
+model Skill {
+  id             Int  @id @default(autoincrement())
+  profileId      Int  @map("profile_id")
+  coreSkills     Json @map("core_skills")
+  softwareTools  Json @map("software_tools")
+  languagesKnown Json @map("languages_known")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model Achievement {
+  id           Int       @id @default(autoincrement())
+  profileId    Int       @map("profile_id")
+  title        String // Achievement / Award Title
+  issuer       String // Issuing Organisation / Authority
+  dateReceived DateTime? @map("date_received")
+  description  String? // Optional description of the achievement
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id           Int    @id @default(autoincrement())
+  profileId    Int    @map("profile_id")
+  projectTitle String // Project / Research Title
+  // role         String    // Your Role
+  // projectUrl   String?   // Optional Project Link / Repository URL
+  description  String // Description & Key Contributions
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  // Optional relation if you have a UserProfile model:
+  // userProfile UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Reference {
+  id           Int      @id @default(autoincrement())
+  profileId    Int      @map("profile_id")
+  profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name         String // Referee Name
+  designation  String // Designation
+  organisation String // Organisation
+  // email        String // Email Address
+  phone        String // Phone Number
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @map("updated_at")
 }
