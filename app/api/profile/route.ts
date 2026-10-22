@@ -7,13 +7,13 @@ import { saveReferences } from "@/app/lib/validation/refrence";
 import { saveProjects } from "@/app/lib/validation/project";
 import { saveAchievements } from "@/app/lib/validation/achievements";
 import { saveSkills } from "@/app/lib/validation/skill";
+import { ValidationError } from "@/app/lib/errors";
 export const runtime = "nodejs";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-class ValidationError extends Error {}
 
 function parseSafeBoolean(value: unknown): boolean {
   if (typeof value === "boolean") return value;
@@ -359,16 +359,7 @@ export async function PATCH(req: NextRequest) {
   });
 
   // --- Personal details tab ---------------------------------------------
-  if (
-    !body.experience &&
-    !body.education &&
-    !body.certificates &&
-    !body.memberships &&
-    !body.references &&
-    !body.projects &&
-    !body.achievements &&
-    !body.coreSkills
-  ) {
+  if (typeof body.father_name === "string") {
     const updated = await prisma.profile.update({
       where: { id: profile.id },
       data: {

@@ -131,7 +131,7 @@ const isSavedId = (id: number) => id > 0;
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-const NAME_REGEX = /^[A-Za-z\s.'-]+$ /;
+const NAME_REGEX = /^[A-Za-z\s.'-]+$/;
 const PREFIX_REGEX = /^0\d{2,3}$/;
 const MOBILE_REGEX = /^\d{7}$/;
 const LANDLINE_REGEX = /^\d{6,8}$/;
@@ -320,9 +320,8 @@ const mapSkills = (p: any): SkillsFormData => {
     core_skills: toStringArray(s?.coreSkills ?? s?.core_skills),
     software_tools: toStringArray(s?.softwareTools ?? s?.software_tools),
     // keep one blank row so the form always has a language input
-    languages_known: languages.length
-      ? languages : []
-      // : [{ language: "", proficiency: "INTERMEDIATE" }],
+    languages_known: languages.length ? languages : [],
+    // : [{ language: "", proficiency: "INTERMEDIATE" }],
   };
 };
 // ---------------------------------------------------------------------------
@@ -2758,6 +2757,7 @@ function useEntryHandlers(
   setFormData: React.Dispatch<React.SetStateAction<ProfileFormData>>,
   setErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>,
   setPendingDelete: React.Dispatch<React.SetStateAction<PendingDelete>>,
+  setIsDirty: React.Dispatch<React.SetStateAction<boolean>>, // <--- 1. Add setIsDirty parameter here
 ) {
   return useMemo(
     () => ({
@@ -2768,6 +2768,7 @@ function useEntryHandlers(
             entry.id === id ? { ...entry, [field]: value } : entry,
           ),
         }));
+        setIsDirty(true); // <--- 2. Mark form as dirty on field change
         setErrors((prev) => {
           const errKey = `${id}_${field}`;
           if (!prev[errKey]) return prev;
@@ -2775,14 +2776,19 @@ function useEntryHandlers(
           return rest;
         });
       },
-      onAdd: () =>
+      onAdd: () => {
         setFormData((prev) => ({
           ...prev,
           [key]: [...(prev[key] as any[]), makeEmpty(nextTempId())],
-        })),
-      onRemove: (id: number) => setPendingDelete({ key, id }),
+        }));
+        setIsDirty(true); // <--- 3. Mark form as dirty on adding a row
+      },
+      onRemove: (id: number) => {
+        setPendingDelete({ key, id });
+        setIsDirty(true); // <--- 4. Mark form as dirty on triggering a delete
+      },
     }),
-    [key, makeEmpty, setFormData, setErrors, setPendingDelete],
+    [key, makeEmpty, setFormData, setErrors, setPendingDelete, setIsDirty],
   );
 }
 
@@ -2796,7 +2802,6 @@ function ProfileTabsContent() {
   const [deleting, setDeleting] = useState(false);
   const queryClient = useQueryClient();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
   const { data: profile } = useUserProfile();
   const { jobId, job, exists, isLoading } = useFindingId();
 
@@ -2839,6 +2844,44 @@ function ProfileTabsContent() {
       behavior: "smooth",
     });
   }, [activeTab]);
+  const [isDirty, setIsDirty] = useState<boolean>(false);
+
+  // ---> 2. ADD BROWSER REFRESH / TAB CLOSE GUARD <---
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  // ---> 3. WRAP TAB CLICKING TO GUARD AGAINST UNSAVED CHANGES <---
+  // const handleTabClick = (tabId: TabId) => {
+  //   if (tabId === activeTab) return;
+  //   if (isDirty) {
+  //     const confirmLeave = window.confirm(
+  //       "You have unsaved changes in this section. Are you sure you want to switch tabs?",
+  //     );
+  //     if (!confirmLeave) return;
+  //   }
+  //   setActiveTab(tabId);
+  //   setIsDirty(false); // Reset dirty flag when successfully changing tabs
+  // };
+
+  const handleTabClick = (tabId: TabId) => {
+  if (tabId === activeTab) return;
+  if (isDirty) {
+    if (!window.confirm("Discard unsaved changes in this section?")) return;
+    if (profile) syncSection(activeTab, profile);
+    setFormData((prev) => ({ ...prev, image: "" }));
+    setErrors({});
+    setIsDirty(false);
+  }
+  setActiveTab(tabId);
+};
+
 
   function syncSection(tab: TabId, p: any) {
     setFormData((prev) => {
@@ -2901,6 +2944,7 @@ function ProfileTabsContent() {
     setFormData,
     setErrors,
     setPendingDelete,
+    setIsDirty,
   );
   const educationHandlers = useEntryHandlers(
     "education",
@@ -2908,6 +2952,7 @@ function ProfileTabsContent() {
     setFormData,
     setErrors,
     setPendingDelete,
+    setIsDirty,
   );
   const certificatesHandlers = useEntryHandlers(
     "certificates",
@@ -2915,6 +2960,7 @@ function ProfileTabsContent() {
     setFormData,
     setErrors,
     setPendingDelete,
+    setIsDirty,
   );
   const membershipsHandlers = useEntryHandlers(
     "memberships",
@@ -2922,6 +2968,7 @@ function ProfileTabsContent() {
     setFormData,
     setErrors,
     setPendingDelete,
+    setIsDirty,
   );
   const achievementsHandlers = useEntryHandlers(
     "achievements",
@@ -2929,6 +2976,7 @@ function ProfileTabsContent() {
     setFormData,
     setErrors,
     setPendingDelete,
+    setIsDirty,
   );
   const projectsHandlers = useEntryHandlers(
     "projects",
@@ -2936,6 +2984,7 @@ function ProfileTabsContent() {
     setFormData,
     setErrors,
     setPendingDelete,
+    setIsDirty,
   );
   const referencesHandlers = useEntryHandlers(
     "references",
@@ -2943,6 +2992,7 @@ function ProfileTabsContent() {
     setFormData,
     setErrors,
     setPendingDelete,
+    setIsDirty,
   );
 
   async function confirmDelete() {
@@ -2956,10 +3006,10 @@ function ProfileTabsContent() {
 
     setDeleting(true);
     try {
-      if (isSavedId(id)) {
-        await api.delete(`${DELETE_ENDPOINTS[key]}/${id}`);
-        queryClient.invalidateQueries({ queryKey: ["profile_data"] });
-      }
+      // if (isSavedId(id)) {
+      //   await api.delete(`${DELETE_ENDPOINTS[key]}/${id}`);
+      //   queryClient.invalidateQueries({ queryKey: ["profile_data"] });
+      // }
 
       setFormData((prev) => {
         const list = prev[key] as any[];
@@ -3254,6 +3304,7 @@ function ProfileTabsContent() {
     const { name } = e.target;
     const value = sanitizeValue(name, e.target.value);
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setIsDirty(true);
     setErrors((prev) => {
       if (!prev[name]) return prev;
       const updated = { ...prev };
@@ -3265,6 +3316,7 @@ function ProfileTabsContent() {
   function handleImageChange(file: File | null) {
     if (file) {
       setFormData((prev) => ({ ...prev, image: file }));
+      setIsDirty(true);
       setErrors((prev) => {
         const { image: _removed, ...rest } = prev;
         return rest;
@@ -3348,13 +3400,23 @@ function ProfileTabsContent() {
 
         case "achievements":
           await api.patch("/api/profile", {
-            achievements: formData.achievements,
+            achievements: formData.achievements.map((a) => ({
+              id: a.id,
+              title: a.title,
+              issuer: a.issuer,
+              dateReceived: a.date_received,
+              description: a.description,
+            })),
           });
           break;
 
         case "projects":
           await api.patch("/api/profile", {
-            projects: formData.projects,
+            projects: formData.projects.map((p) => ({
+              id: p.id,
+              projectTitle: p.project_title,
+              description: p.description,
+            })),
           });
           break;
 
@@ -3371,7 +3433,7 @@ function ProfileTabsContent() {
       await queryClient.invalidateQueries({ queryKey: ["profile_data"] });
       const fresh = queryClient.getQueryData<any>(["profile_data"]);
       if (fresh) syncSection(activeTab, fresh);
-
+      setIsDirty(false);
       toast.success(`${label} saved successfully`);
     } catch (err) {
       if ((err as any)?.response?.status === 401) return;
@@ -3420,7 +3482,9 @@ function ProfileTabsContent() {
   }
 
   const alreadyApplied = Boolean(applied?.applied);
+  //is stop before move
 
+  // end it
   return (
     <div
       className="min-h-screen py-10 px-4"
@@ -3484,7 +3548,7 @@ function ProfileTabsContent() {
                     aria-selected={isActive}
                     aria-controls={`panel-${tab.id}`}
                     disabled={saving}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => handleTabClick(tab.id)}
                     className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs sm:text-sm transition-all duration-150 cursor-pointer text-left border ${
                       isActive
                         ? "bg-white text-blue-600 font-semibold shadow-sm border-slate-300/80"
@@ -3541,9 +3605,10 @@ function ProfileTabsContent() {
                   software_tools: formData.software_tools,
                   languages_known: formData.languages_known,
                 }}
-                onChange={(newData) =>
-                  setFormData((prev) => ({ ...prev, ...newData }))
-                }
+                onChange={(newData) => {
+                  setFormData((prev) => ({ ...prev, ...newData }));
+                  setIsDirty(true); // <--- Mark form as dirty when skills/languages change
+                }}
                 errors={errors}
               />
             )}
