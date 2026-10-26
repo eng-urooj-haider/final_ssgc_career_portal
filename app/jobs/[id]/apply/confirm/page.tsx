@@ -600,7 +600,7 @@ export default function JobApplicationConfirmPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60 cursor-pointer"
                   style={{ background: flameGradient }}
                 >
                   {submitting ? "Submitting…" : "Confirm Your Job Application"}
@@ -623,7 +623,7 @@ export default function JobApplicationConfirmPage() {
             <button
               type="button"
               onClick={handleCancelAndLogout}
-              className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 cursor-pointer"
               style={{ background: "#E0554A" }}
             >
               Cancel &amp; Logoff

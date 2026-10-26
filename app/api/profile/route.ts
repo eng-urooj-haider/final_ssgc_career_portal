@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/lib/db";
 import { verifyToken } from "@/app/lib/auth";
-import { saveReferences } from "@/app/lib/validation/refrence";
-import { saveProjects } from "@/app/lib/validation/project";
-import { saveAchievements } from "@/app/lib/validation/achievements";
 import { saveSkills } from "@/app/lib/validation/skill";
 import { ValidationError } from "@/app/lib/errors";
 import { saveCertificates } from "@/app/lib/validation/certificate";
@@ -122,31 +119,90 @@ export async function PATCH(req: NextRequest) {
   }
 
   // --- Experience tab ----------------------------------------------------
+  // if (body.experience) {
+  //   await prisma.$transaction([
+  //     prisma.experience.deleteMany({ where: { profileId: profile.id } }),
+  //     prisma.experience.createMany({
+  //       data: body.experience.map((e: any) => ({
+  //         profileId: profile.id,
+  //         jobTitle: e.job_title,
+  //         company: e.company,
+  //         country: toIntOrNull(e.country),
+  //         city: toIntOrNull(e.city),
+  //         startDate: parseFlexibleDate(e.start_date),
+  //         endDate: parseFlexibleDate(e.end_date),
+  //         salary: e.salary || null,
+  //         responsibility: e.responsibilities || null,
+  //         reasonForLeave: e.reason || null,
+  //         cityOther: e.city_other || "",
+  //       })),
+  //     }),
+  //   ]);
+  //   return NextResponse.json({ ok: true });
+  // }
   if (body.experience) {
-    await prisma.$transaction([
-      prisma.experience.deleteMany({ where: { profileId: profile.id } }),
-      prisma.experience.createMany({
-        data: body.experience.map((e: any) => ({
-          profileId: profile.id,
+    const items: any[] = body.experience;
+
+    // Only rows that belong to THIS profile can be updated or deleted.
+    const existing = await prisma.experience.findMany({
+      where: { profileId: profile.id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((e) => e.id));
+
+    // Positive ids = existing rows, anything else (null / negative) = new rows.
+    const isExisting = (e: any) =>
+      typeof e.id === "number" && e.id > 0 && existingIds.has(e.id);
+
+    const incomingIds = new Set(
+      items.filter(isExisting).map((e) => e.id as number),
+    );
+    const idsToDelete = existing
+      .map((e) => e.id)
+      .filter((id) => !incomingIds.has(id));
+
+    const saved = await prisma.$transaction(async (tx) => {
+      // 1. Delete rows that were removed in the form
+      if (idsToDelete.length > 0) {
+        await tx.experience.deleteMany({
+          where: { id: { in: idsToDelete }, profileId: profile.id },
+        });
+      }
+
+      // 2. Update existing rows or create new ones
+      for (const e of items) {
+        const data = {
           jobTitle: e.job_title,
           company: e.company,
           country: toIntOrNull(e.country),
           city: toIntOrNull(e.city),
-          startDate: parseFlexibleDate(e.start_date),
+          startDate: parseFlexibleDate(e.start_date) as Date,
           endDate: parseFlexibleDate(e.end_date),
           salary: e.salary || null,
           responsibility: e.responsibilities || null,
           reasonForLeave: e.reason || null,
           cityOther: e.city_other || "",
-        })),
-      }),
-    ]);
-    return NextResponse.json({ ok: true });
+        };
+
+        if (isExisting(e)) {
+          await tx.experience.update({ where: { id: e.id }, data });
+        } else {
+          await tx.experience.create({
+            data: { ...data, profileId: profile.id },
+          });
+        }
+      }
+    });
+
+    return NextResponse.json({ ok: true, data: saved });
   }
 
   // --- Education tab -----------------------------------------------------
   if (body.education) {
-    for (const e of body.education) {
+    const items: any[] = body.education;
+
+    // Keep your existing "other" checks
+    for (const e of items) {
       if (
         e.qualification_group_id === "other" &&
         !textOrNull(e.qualification_group_other)
@@ -167,42 +223,72 @@ export async function PATCH(req: NextRequest) {
         );
     }
 
-    await prisma.$transaction([
-      prisma.education.deleteMany({ where: { profileId: profile.id } }),
-      prisma.education.createMany({
-        data: body.education.map((e: any) => {
-          const groupOther = e.qualification_group_id === "other";
-          const qualOther = e.qualification_id === "other";
-          const instOther = e.institute_id === "other";
-          const cityOther = e.city === "other";
+    // Only rows that belong to THIS profile can be updated or deleted.
+    const existing = await prisma.education.findMany({
+      where: { profileId: profile.id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((e) => e.id));
 
-          return {
-            profileId: profile.id,
-            qualificationGroupId: groupOther
-              ? null
-              : toIntOrNull(e.qualification_group_id),
-            qualificationGroupOther: groupOther
-              ? textOrNull(e.qualification_group_other)
-              : null,
-            qualificationId: qualOther ? null : toIntOrNull(e.qualification_id),
-            qualificationOther: qualOther
-              ? textOrNull(e.qualification_other)
-              : null,
-            institutionId: instOther ? null : toIntOrNull(e.institute_id),
-            instituteOther: instOther ? textOrNull(e.institute_other) : null,
-            majorSubject: e.major_subject,
-            countryId: Number(e.country),
-            cityId: cityOther ? null : toIntOrNull(e.city),
-            cityOther: cityOther ? textOrNull(e.city_other) : null,
-            passingYear: Number(e.passing_year),
-            obtainedMarks: Number(e.obtained_marks_gpa),
-            totalMarks: Number(e.total_marks_gpa),
-            divisionGrade: e.division_grade || null,
-          };
-        }),
-      }),
-    ]);
-    return NextResponse.json({ ok: true });
+    // Positive ids that belong to this profile = update, anything else = create.
+    const isExisting = (e: any) =>
+      typeof e.id === "number" && e.id > 0 && existingIds.has(e.id);
+
+    const incomingIds = new Set(
+      items.filter(isExisting).map((e) => e.id as number),
+    );
+    const idsToDelete = existing
+      .map((e) => e.id)
+      .filter((id) => !incomingIds.has(id));
+
+    const saved = await prisma.$transaction(async (tx) => {
+      // 1. Delete rows that were removed in the form
+      if (idsToDelete.length > 0) {
+        await tx.education.deleteMany({
+          where: { id: { in: idsToDelete }, profileId: profile.id },
+        });
+      }
+
+      // 2. Update existing rows or create new ones
+      for (const e of items) {
+        const groupOther = e.qualification_group_id === "other";
+        const qualOther = e.qualification_id === "other";
+        const instOther = e.institute_id === "other";
+        const cityOther = e.city === "other";
+
+        const data = {
+          qualificationGroupId: groupOther
+            ? null
+            : toIntOrNull(e.qualification_group_id),
+          qualificationGroupOther: groupOther
+            ? textOrNull(e.qualification_group_other)
+            : null,
+          qualificationId: qualOther ? null : toIntOrNull(e.qualification_id),
+          qualificationOther: qualOther
+            ? textOrNull(e.qualification_other)
+            : null,
+          institutionId: instOther ? null : toIntOrNull(e.institute_id),
+          instituteOther: instOther ? textOrNull(e.institute_other) : null,
+          majorSubject: e.major_subject,
+          countryId: Number(e.country),
+          cityId: cityOther ? null : toIntOrNull(e.city),
+          cityOther: cityOther ? textOrNull(e.city_other) : null,
+          passingYear: Number(e.passing_year),
+          obtainedMarks: Number(e.obtained_marks_gpa),
+          totalMarks: Number(e.total_marks_gpa),
+          divisionGrade: e.division_grade || null,
+        };
+        if (isExisting(e)) {
+          await tx.education.update({ where: { id: e.id }, data });
+        } else {
+          await tx.education.create({
+            data: { ...data, profileId: profile.id },
+          });
+        }
+      }
+    });
+
+    return NextResponse.json({ ok: true, data: saved });
   }
 
   // --- Certificates tab --------------------------------------------------
@@ -228,68 +314,205 @@ export async function PATCH(req: NextRequest) {
 
   // --- Memberships tab ---------------------------------------------------
   if (body.memberships) {
-    await prisma.$transaction([
-      prisma.membership.deleteMany({ where: { profileId: profile.id } }),
-      prisma.membership.createMany({
-        data: body.memberships.map((m: any) => ({
-          profileId: profile.id,
+    const items: any[] = body.memberships;
+
+    // Only rows that belong to THIS profile can be updated or deleted.
+    const existing = await prisma.membership.findMany({
+      where: { profileId: profile.id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((m) => m.id));
+
+    // Positive ids that belong to this profile = update, anything else = create.
+    const isExisting = (m: any) =>
+      typeof m.id === "number" && m.id > 0 && existingIds.has(m.id);
+
+    const incomingIds = new Set(
+      items.filter(isExisting).map((m) => m.id as number),
+    );
+    const idsToDelete = existing
+      .map((m) => m.id)
+      .filter((id) => !incomingIds.has(id));
+
+    const saved = await prisma.$transaction(async (tx) => {
+      // 1. Delete rows that were removed in the form
+      if (idsToDelete.length > 0) {
+        await tx.membership.deleteMany({
+          where: { id: { in: idsToDelete }, profileId: profile.id },
+        });
+      }
+
+      // 2. Update existing rows or create new ones
+      for (const m of items) {
+        const data = {
           organisation: m.organisation,
           membershipType: m.membership_type || null,
           memberSince: m.member_since || null,
-        })),
-      }),
-    ]);
-    return NextResponse.json({ ok: true });
+        };
+        if (isExisting(m)) {
+          await tx.membership.update({ where: { id: m.id }, data });
+        } else {
+          await tx.membership.create({
+            data: { ...data, profileId: profile.id },
+          });
+        }
+      }
+    });
+
+    return NextResponse.json({ ok: true, data: saved });
   }
   // --- References tab ----------------------------------------------------
   if (body.references) {
-    try {
-      const saved = await saveReferences(profile.id, body.references);
-      return NextResponse.json({ ok: true, references: saved });
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+    const items: any[] = body.references;
+
+    // Only rows that belong to THIS profile can be updated or deleted.
+    const existing = await prisma.reference.findMany({
+      where: { profileId: profile.id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((r) => r.id));
+
+    // Positive ids that belong to this profile = update, anything else = create.
+    const isExisting = (r: any) =>
+      typeof r.id === "number" && r.id > 0 && existingIds.has(r.id);
+
+    const incomingIds = new Set(
+      items.filter(isExisting).map((r) => r.id as number),
+    );
+    const idsToDelete = existing
+      .map((r) => r.id)
+      .filter((id) => !incomingIds.has(id));
+
+    const saved = await prisma.$transaction(async (tx) => {
+      // 1. Delete rows that were removed in the form
+      if (idsToDelete.length > 0) {
+        await tx.reference.deleteMany({
+          where: { id: { in: idsToDelete }, profileId: profile.id },
+        });
       }
-      console.error("Error saving references:", error);
-      return NextResponse.json(
-        { error: "Failed to update references" },
-        { status: 500 },
-      );
-    }
+
+      // 2. Update existing rows or create new ones
+      const results: any[] = [];
+      for (const r of items) {
+        const data = {
+          name: r.name,
+          designation: r.designation,
+          organisation: r.organisation,
+          phone: r.phone,
+        };
+
+        results.push(
+          isExisting(r)
+            ? await tx.reference.update({ where: { id: r.id }, data })
+            : await tx.reference.create({
+                data: { ...data, profileId: profile.id },
+              }),
+        );
+      }
+      return results;
+    });
+
+    return NextResponse.json({ ok: true, data: saved });
   }
   // --- Projects & Research tab -------------------------------------------
   if (body.projects) {
-    try {
-      const saved = await saveProjects(profile.id, body.projects);
-      return NextResponse.json({ ok: true, projects: saved });
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+    const items: any[] = body.projects;
+
+    // Only rows that belong to THIS profile can be updated or deleted.
+    const existing = await prisma.project.findMany({
+      where: { profileId: profile.id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((p) => p.id));
+
+    // Positive ids that belong to this profile = update, anything else = create.
+    const isExisting = (p: any) =>
+      typeof p.id === "number" && p.id > 0 && existingIds.has(p.id);
+
+    const incomingIds = new Set(
+      items.filter(isExisting).map((p) => p.id as number),
+    );
+    const idsToDelete = existing
+      .map((p) => p.id)
+      .filter((id) => !incomingIds.has(id));
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete rows that were removed in the form
+      if (idsToDelete.length > 0) {
+        await tx.project.deleteMany({
+          where: { id: { in: idsToDelete }, profileId: profile.id },
+        });
       }
-      console.error("Error saving projects:", error);
-      return NextResponse.json(
-        { error: "Failed to update projects and research" },
-        { status: 500 },
-      );
-    }
+
+      // 2. Update existing rows or create new ones
+      for (const p of items) {
+        const data = {
+          projectTitle: p.projectTitle,
+          description: p.description,
+        };
+
+        if (isExisting(p)) {
+          await tx.project.update({ where: { id: p.id }, data });
+        } else {
+          await tx.project.create({
+            data: { ...data, profileId: profile.id },
+          });
+        }
+      }
+    });
+
+    return NextResponse.json({ ok: true });
   }
   // --- Achievements & Awards tab -----------------------------------------
   if (body.achievements) {
-    console.log(body.achievements);
-    try {
-      const saved = await saveAchievements(profile.id, body.achievements);
-      console.log(saved);
-      return NextResponse.json({ ok: true, achievements: saved });
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return NextResponse.json({ error: error.message }, { status: 400 });
+    const items: any[] = body.achievements;
+
+    // Only rows that belong to THIS profile can be updated or deleted.
+    const existing = await prisma.achievement.findMany({
+      where: { profileId: profile.id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((a) => a.id));
+
+    // Positive ids that belong to this profile = update, anything else = create.
+    const isExisting = (a: any) =>
+      typeof a.id === "number" && a.id > 0 && existingIds.has(a.id);
+
+    const incomingIds = new Set(
+      items.filter(isExisting).map((a) => a.id as number),
+    );
+    const idsToDelete = existing
+      .map((a) => a.id)
+      .filter((id) => !incomingIds.has(id));
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete rows that were removed in the form
+      if (idsToDelete.length > 0) {
+        await tx.achievement.deleteMany({
+          where: { id: { in: idsToDelete }, profileId: profile.id },
+        });
       }
-      console.error("Error saving achievements:", error);
-      return NextResponse.json(
-        { error: "Failed to update achievements and awards" },
-        { status: 500 },
-      );
-    }
+
+      // 2. Update existing rows or create new ones
+      for (const a of items) {
+        const data = {
+          title: a.title,
+          issuer: a.issuer,
+          dateReceived: parseFlexibleDate(a.dateReceived) as Date,
+          description: a.description || null,
+        };
+
+        if (isExisting(a)) {
+          await tx.achievement.update({ where: { id: a.id }, data });
+        } else {
+          await tx.achievement.create({
+            data: { ...data, profileId: profile.id },
+          });
+        }
+      }
+    });
+
+    return NextResponse.json({ ok: true });
   }
   // --- Skills & Languages tab --------------------------------------------
   if (body.coreSkills) {

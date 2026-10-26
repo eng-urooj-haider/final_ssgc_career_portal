@@ -9,7 +9,6 @@ import React, {
   type ReactNode,
   type ChangeEvent,
 } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   User,
@@ -43,6 +42,7 @@ import LogoutButton from "@/app/components/LogoutButton";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { flame } from "../../lib/flameTheme";
 import api from "../../lib/api";
+import Link from "next/link";
 
 type TabId =
   | "photo"
@@ -98,17 +98,6 @@ const SECTION_LABELS: Record<string, string> = {
   projects: "Projects & Research",
   references: "References",
 };
-
-const DELETE_ENDPOINTS: Record<EntryKey, string> = {
-  experience: "/api/experiences",
-  education: "/api/education",
-  certificates: "/api/certificate",
-  memberships: "/api/memberships",
-  achievements: "/api/achievements",
-  projects: "/api/projects",
-  references: "/api/references",
-};
-
 const ENTRY_LABELS: Record<EntryKey, string> = {
   experience: "experience",
   education: "education",
@@ -2871,17 +2860,16 @@ function ProfileTabsContent() {
   // };
 
   const handleTabClick = (tabId: TabId) => {
-  if (tabId === activeTab) return;
-  if (isDirty) {
-    if (!window.confirm("Discard unsaved changes in this section?")) return;
-    if (profile) syncSection(activeTab, profile);
-    setFormData((prev) => ({ ...prev, image: "" }));
-    setErrors({});
-    setIsDirty(false);
-  }
-  setActiveTab(tabId);
-};
-
+    if (tabId === activeTab) return;
+    if (isDirty) {
+      if (!window.confirm("Discard unsaved changes in this section?")) return;
+      if (profile) syncSection(activeTab, profile);
+      setFormData((prev) => ({ ...prev, image: "" }));
+      setErrors({});
+      setIsDirty(false);
+    }
+    setActiveTab(tabId);
+  };
 
   function syncSection(tab: TabId, p: any) {
     setFormData((prev) => {
@@ -3513,7 +3501,68 @@ function ProfileTabsContent() {
       {jobId && exists && progressPercentage !== 0 && (
         <ProgressBar progress={progressPercentage} />
       )}
+      {jobId && exists && progressPercentage === 100 && (
+        <div className="max-w-7xl mx-auto mb-6">
+          <div
+            className="bg-white rounded-xl p-6"
+            style={{ border: "1px solid #E7E5E1" }}
+          >
+            <p
+              className="text-sm font-semibold mb-4"
+              style={{ color: flame.ink }}
+            >
+              {alreadyApplied
+                ? "You have already applied for the following job position:"
+                : "You are applying for the following job position:"}
+            </p>
 
+            <table className="w-full text-sm text-left border border-slate-200 rounded-md overflow-hidden">
+              <thead style={{ background: "#F8FAFC" }}>
+                <tr>
+                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
+                    Job Code
+                  </th>
+                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
+                    Job Title
+                  </th>
+                  <th className="px-4 py-2 border-b border-slate-200 font-semibold text-slate-700">
+                    Deadline
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="px-4 py-2 text-slate-600">
+                    {job?.jobCode ?? "-"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">
+                    {job?.title ?? "-"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">
+                    {formatDeadline(job?.deadline)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {!alreadyApplied && (
+              <>
+                <p className="mt-4 text-sm text-slate-700">
+                  Note: Please review your resume details below before
+                  confirming your job application.
+                </p>
+                <Link
+                  href={`/jobs/${job?.uuid}/apply/confirm`}
+                  className="mt-3 inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                  style={{ background: flameGradient }}
+                >
+                  Confirm Your Job Application
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto">
         <div
           className="bg-white rounded-xl overflow-hidden"
