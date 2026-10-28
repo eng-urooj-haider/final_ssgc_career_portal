@@ -175,6 +175,7 @@ const mapPersonal = (p: any) => ({
   ssgc_employee_name: p.ssgcEmployeeName ?? "",
   ssgc_employee_number: p.ssgcEmployeeNumber ?? "",
   is_pakistani: p.isPakistani != null ? (p.isPakistani ? "1" : "0") : "1",
+  professional_summary: p.professionalSummary ?? "",
 });
 
 const mapExperience = (list: any[]): ExperienceEntry[] =>
@@ -614,7 +615,7 @@ function PhotoTab({ image, onChange, error, canAdd = true }: PhotoTabProps) {
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                  className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 cursor-pointer"
                   style={{ background: flameGradient }}
                 >
                   <Upload className="w-4 h-4" />
@@ -673,6 +674,7 @@ interface PersonalFormData {
   ssgc_employee_name: string;
   ssgc_employee_number: string;
   is_pakistani: string;
+  professional_summary: string;
 }
 
 interface PersonalTabProps {
@@ -988,6 +990,22 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
             </Field>
           </>
         )}
+      </div>
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+        <Field
+          label="Professional Summary"
+          required
+          error={errors.professional_summary}
+        >
+          <FlameTextarea
+            rows={3}
+            maxLength={150}
+            name="professional_summary"
+            value={formData.professional_summary || ""}
+            onChange={onChange}
+            placeholder="Briefly describe your professional Summary"
+          />
+        </Field>
       </div>
     </div>
   );
@@ -2630,6 +2648,7 @@ const initialFormData: ProfileFormData = {
   ssgc_employee_name: "",
   ssgc_employee_number: "",
   is_pakistani: "",
+  professional_summary: "",
   core_skills: [],
   software_tools: [],
   languages_known: [{ language: "", proficiency: "INTERMEDIATE" }],
@@ -3059,7 +3078,9 @@ function ProfileTabsContent() {
       if (!formData.is_pakistani) {
         newErrors.is_pakistani = "Nationality is required";
       }
-
+      if (!formData.professional_summary) {
+        newErrors.professional_summary = "Professional Summary is required";
+      }
       if (!formData.date_of_birth) {
         newErrors.date_of_birth = "Date of birth is required";
       } else {
@@ -3735,7 +3756,7 @@ function ProfileTabsContent() {
                 <button
                   type="button"
                   disabled={saving}
-                  className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                  className="rounded-md px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60 cursor-pointer"
                   style={{ background: flameGradient }}
                   onClick={handleSubmit}
                 >

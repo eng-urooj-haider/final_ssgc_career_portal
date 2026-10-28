@@ -26,6 +26,7 @@ import {
   StyleSheet,
   pdf,
 } from "@react-pdf/renderer";
+import { workedMonths, fmtMonths, type DateLike } from "@/app/lib/experience";
 
 // ---------------------------------------------------------------------------
 // Prisma include — use this wherever you load a profile for the CV.
@@ -156,8 +157,6 @@ const styles = StyleSheet.create({
 // Public input type
 // ---------------------------------------------------------------------------
 
-type DateLike = Date | string | null | undefined;
-
 export interface CvInput {
   profile: {
     firstName: string;
@@ -178,7 +177,9 @@ export interface CvInput {
     professionalSummary?: string | null;
     noticePeriod?: string | null;
     expectedSalary?: unknown;
-
+    birthCity?: { cityName?: string | null } | null;
+    birthCityOther?: string | null;
+    birthCountry?: { countryName?: string | null } | null;
     experiences?: {
       id?: number;
       jobTitle: string;
@@ -232,7 +233,7 @@ export interface CvInput {
     createdAt: DateLike;
   };
   /** Ids of the experiences the candidate marked "relevant" for this job. */
-  relevantExperienceIds?: number[];
+  relevantExperienceIds?: (number | string)[];
   /** Optional extra achievements as plain strings. */
   achievements?: string[];
 }
@@ -242,8 +243,18 @@ export interface CvInput {
 // ---------------------------------------------------------------------------
 
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 function toDate(d: unknown): Date | null {
@@ -262,37 +273,6 @@ function fmtDate(d: unknown): string {
 function fmtYear(d: unknown): string {
   const date = toDate(d);
   return date ? String(date.getUTCFullYear()) : "-";
-}
-
-function monthIndex(d: Date): number {
-  return d.getUTCFullYear() * 12 + d.getUTCMonth();
-}
-
-/** Set of distinct calendar months worked (overlapping jobs aren't double counted). */
-function workedMonths(
-  ranges: [DateLike, DateLike][],
-  afterMonthIndex?: number,
-): Set<number> {
-  const set = new Set<number>();
-  for (const [start, end] of ranges) {
-    const s = toDate(start);
-    if (!s) continue;
-    const e = end ? toDate(end) : new Date();
-    if (!e) continue;
-    let from = monthIndex(s);
-    const to = monthIndex(e);
-    if (afterMonthIndex !== undefined) from = Math.max(from, afterMonthIndex + 1);
-    for (let m = from; m <= to; m++) set.add(m);
-  }
-  return set;
-}
-
-function fmtMonths(total: number): string {
-  if (total <= 0) return "-";
-  const years = Math.floor(total / 12);
-  const months = total % 12;
-  if (years === 0) return `${months}m`;
-  return months > 0 ? `${years}y ${months}m` : `${years}y`;
 }
 
 function fmtMoney(v: unknown): string {
@@ -316,14 +296,17 @@ function fmtCnic(c?: string | null): string {
 }
 
 function fmtDuration(value: unknown, unit?: string | null): string {
-  if (value === null || value === undefined || value === "" || !unit) return "-";
+  if (value === null || value === undefined || value === "" || !unit)
+    return "-";
   const n = Number(String(value));
   let u = titleCase(unit);
   if (n === 1 && u.endsWith("s")) u = u.slice(0, -1);
   return `${value} ${u}`;
 }
 
-function nameOf(v: { name?: string | null } | string | null | undefined): string {
+function nameOf(
+  v: { name?: string | null } | string | null | undefined,
+): string {
   if (!v) return "";
   return typeof v === "string" ? v : (v.name ?? "");
 }
@@ -343,7 +326,9 @@ function languageNames(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return v
     .map((l) =>
-      typeof l === "string" ? l : ((l as { language?: string })?.language ?? ""),
+      typeof l === "string"
+        ? l
+        : ((l as { language?: string })?.language ?? ""),
     )
     .filter((x) => x.trim() !== "");
 }
@@ -370,7 +355,10 @@ function byMostRecent(
   const ea = endKey(a);
   const eb = endKey(b);
   if (ea !== eb) return ea < eb ? 1 : -1;
-  return (toDate(b.startDate)?.getTime() ?? 0) - (toDate(a.startDate)?.getTime() ?? 0);
+  return (
+    (toDate(b.startDate)?.getTime() ?? 0) -
+    (toDate(a.startDate)?.getTime() ?? 0)
+  );
 }
 
 /** Turns the stored profile picture path into something react-pdf can embed. */
@@ -582,7 +570,10 @@ function CvDocument({ data }: { data: CvData }) {
             right={["CNIC:", data.cnic]}
           />
           <KvRow
-            left={["Latest Designation / Organization:", data.latestDesignationOrg]}
+            left={[
+              "Latest Designation / Organization:",
+              data.latestDesignationOrg,
+            ]}
             right={["Address:", data.address]}
           />
           <KvRow
@@ -725,16 +716,19 @@ export async function buildCvPdf(input: CvInput): Promise<Buffer> {
     (e) => [e.startDate, e.endDate] as [DateLike, DateLike],
   );
 
-  // Relevant experience = only the experiences the candidate selected for this job
-  const relevantIds = input.relevantExperienceIds ?? [];
-  const relevantRanges = relevantIds.length
-    ? experiences
-        .filter((e) => e.id != null && relevantIds.includes(e.id))
-        .map((e) => [e.startDate, e.endDate] as [DateLike, DateLike])
-    : allRanges;
+  // Relevant experience = only the experiences the candidate selected for this job.
+  // Ids are coerced to numbers so "12" (from FormData) matches 12 (from the DB).
+  // If nothing was selected, it is shown as "-" (NOT silently copied from total).
+  const relevantIds = (input.relevantExperienceIds ?? []).map(Number);
+  const relevantRanges = experiences
+    .filter((e) => e.id != null && relevantIds.includes(Number(e.id)))
+    .map((e) => [e.startDate, e.endDate] as [DateLike, DateLike]);
 
   // Post-qualification experience = months worked after the latest passing year
-  const latestPassingYear = Math.max(0, ...education.map((e) => yearNum(e.passingYear)));
+  const latestPassingYear = Math.max(
+    0,
+    ...education.map((e) => yearNum(e.passingYear)),
+  );
   const postQualMonths =
     latestPassingYear >= 1950
       ? workedMonths(allRanges, latestPassingYear * 12 + 11).size
@@ -755,12 +749,17 @@ export async function buildCvPdf(input: CvInput): Promise<Buffer> {
       : `${profile.mobilePrefix ?? ""}${profile.mobileNumber ?? ""}` || "-";
 
   // Address on the first line, "City – Country" on the second
-  const cityCountry = [profile.currentCity, profile.currentCountry]
+  // Address on the first line, "City – Country" on the second
+  const cityCountry = [
+    profile.birthCity?.cityName ?? profile.birthCityOther ?? null,
+    profile.birthCountry?.countryName ?? null,
+  ]
     .filter(Boolean)
     .join(" – ");
+
   const address =
     [profile.currentAddress, cityCountry].filter(Boolean).join("\n") || "-";
-
+  console.log("cityCountry", profile.birthCity);
   const achievements = [
     ...(profile.achievements ?? [])
       .filter((a) => a.title)
@@ -785,7 +784,9 @@ export async function buildCvPdf(input: CvInput): Promise<Buffer> {
     dateOfApplication: fmtDate(application.createdAt),
     statusNotice: profile.noticePeriod || "-",
     totalExperience: fmtMonths(workedMonths(allRanges).size),
-    relevantExperience: fmtMonths(workedMonths(relevantRanges).size),
+    relevantExperience: relevantRanges.length
+      ? fmtMonths(workedMonths(relevantRanges).size)
+      : "-",
     postQualificationYears: fmtMonths(postQualMonths),
     latestDesignationOrg: latest
       ? `${latest.jobTitle}\n${latest.company}`

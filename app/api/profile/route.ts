@@ -113,6 +113,7 @@ export async function PATCH(req: NextRequest) {
         ssgcEmployeeName: body.ssgc_employee_name,
         ssgcEmployeeNumber: body.ssgc_employee_number,
         isPakistani: parseSafeBoolean(body.is_pakistani),
+        professionalSummary: body.professional_summary,
       },
     });
     return NextResponse.json({ profile: updated });

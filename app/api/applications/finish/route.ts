@@ -4,8 +4,7 @@ import { verifyToken } from "@/app/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import { existsSync, readFileSync } from "fs";
 import path from "path";
-import { buildCvPdf } from "@/app/lib/generateCv";
-
+import { buildCvPdf, CV_PROFILE_INCLUDE } from "@/app/lib/generateCv";
 const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads", "jobs");
 const ALLOWED_MIME = new Set([
   "application/pdf",
@@ -54,8 +53,10 @@ export async function POST(req: NextRequest) {
     const profile = await prisma.profile.findUnique({
       where: { userId },
       include: {
+        ...CV_PROFILE_INCLUDE,
         user: { select: { email: true } },
-        experiences: true,
+        birthCity: true, // City row for birthCityId
+        birthCountry: true,
         education: {
           include: {
             institution: true,
@@ -63,7 +64,6 @@ export async function POST(req: NextRequest) {
             qualification: true,
           },
         },
-        certificates: true,
       },
     });
 
@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
     const selectedExperiences = profile.experiences
       .filter((e) => experienceIds.includes(e.id))
       .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+    // const totalExperiences =
 
     if (selectedExperiences.length !== new Set(experienceIds).size) {
       return NextResponse.json(
@@ -144,8 +145,7 @@ export async function POST(req: NextRequest) {
     //       orderBy: { startDate: "asc" },
     //     })
     //   : [];
-    // 8. Profile photo -> base64 data URI
-    const experiences = selectedExperiences; // pass this to buildCvPdf
+    // 8. Profile photo -> base64 data URI // pass this to buildCvPdf
     let userPicDataUri: string | null = null;
     if (profile.userPic) {
       const picPath = path.join(
@@ -159,19 +159,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 9. Build and save the CV snapshot
-    // 9. Build and save the CV snapshot
     const pdfBuffer = await buildCvPdf({
       profile: {
-        ...profile,
+        ...profile, // ALL experiences, education, achievements, skills, etc.
         firstName: profile.firstName ?? "",
         lastName: profile.lastName ?? "",
         cnic: profile.cnic ?? "",
-        nationality:profile.isPakistani ? "Yes" : "No",
-        professionalSummary:  "",
         email: profile.user.email,
-        userPic: userPicDataUri,
-        experiences: selectedExperiences, // Moved inside profile
+        professionalSummary: profile.professionalSummary ?? "",
+        certificates: selectedCertificates, // only the selected certificates
       },
       job: {
         jobCode: job.jobCode,
@@ -181,7 +177,9 @@ export async function POST(req: NextRequest) {
         id: application.id,
         createdAt: application.createdAt,
       },
+      relevantExperienceIds: experienceIds, // only the selected experiences
     });
+
     const cvDir = path.join(UPLOAD_ROOT, `job-${job.jobCode}`, "cv");
     await mkdir(cvDir, { recursive: true });
     const clean = (v: string | null) =>

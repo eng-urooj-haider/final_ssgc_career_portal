@@ -249,7 +249,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#D88900] hover:text-[#F5A623]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#D88900] hover:text-[#F5A623] cursor-pointer"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -270,7 +270,7 @@ export default function LoginPage() {
             <GradientButton
               type="submit"
               disabled={LoginMutation.isPending}
-              className="w-full !rounded-lg !px-6 !py-3 !font-semibold"
+              className="w-full !rounded-lg !px-6 !py-3 !font-semibold cursor-pointer"
             >
               {LoginMutation.isPending ? "Logging in..." : "Login"}
             </GradientButton>
