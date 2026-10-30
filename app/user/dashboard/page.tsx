@@ -370,6 +370,10 @@ function Field({
     </Tag>
   );
 }
+function capitalizeFirstLetter(val: string): string {
+  if (!val) return "";
+  return val.charAt(0).toUpperCase() + val.slice(1);
+}
 
 const controlBase =
   "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition focus:outline-none focus:border-[#1C6FD9] focus:ring-2 focus:ring-[#1C6FD9]/20 disabled:bg-slate-50 disabled:text-slate-500";
@@ -999,7 +1003,7 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
         >
           <FlameTextarea
             rows={3}
-            maxLength={150}
+            // maxLength={150}
             name="professional_summary"
             value={formData.professional_summary || ""}
             onChange={onChange}
@@ -1139,10 +1143,12 @@ function ExperienceTab({
               >
                 <FlameInput
                   value={entry.job_title || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "job_title", e.target.value)
-                  }
+                  // onChange={(e) =>
+                  //   onFieldChange(entry.id, "job_title", e.target.value)
+                  // }
+                  onChange={(e) => onFieldChange(entry.id, "job_title", capitalizeFirstLetter(e.target.value))}
                   placeholder="Software Engineer"
+                  maxLength={80}
                 />
               </Field>
 
@@ -1153,10 +1159,13 @@ function ExperienceTab({
               >
                 <FlameInput
                   value={entry.company || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "company", e.target.value)
-                  }
+                  // onChange={(e) =>
+                  //   onFieldChange(entry.id, "company", e.target.value)
+                  // }
+                  onChange={(e) => onFieldChange(entry.id, "company", capitalizeFirstLetter(e.target.value))}
+
                   placeholder="SSGC"
+                  maxLength={80}
                 />
               </Field>
 
@@ -1226,11 +1235,16 @@ function ExperienceTab({
                 error={errors[`${entry.id}_salary`]}
               >
                 <FlameInput
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={9}
                   value={entry.salary || ""}
                   onChange={(e) =>
-                    onFieldChange(entry.id, "salary", e.target.value)
+                    onFieldChange(
+                      entry.id,
+                      "salary",
+                      e.target.value.replace(/\D+/g, ""),
+                    )
                   }
                   placeholder="80000"
                 />
@@ -1244,9 +1258,11 @@ function ExperienceTab({
                 <FlameTextarea
                   rows={3}
                   value={entry.responsibilities || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "responsibilities", e.target.value)
-                  }
+                  // onChange={(e) =>
+                  //   onFieldChange(entry.id, "responsibilities", e.target.value)
+                  // }
+                  onChange={(e) => onFieldChange(entry.id, "responsibilities", capitalizeFirstLetter(e.target.value))}
+                  maxLength={500}
                   placeholder="Briefly describe your role and achievements"
                 />
               </Field>
@@ -1259,9 +1275,11 @@ function ExperienceTab({
                 <FlameTextarea
                   rows={3}
                   value={entry.reason || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "reason", e.target.value)
-                  }
+                  // onChange={(e) =>
+                  //   onFieldChange(entry.id, "reason", e.target.value)
+                  // }
+                  onChange={(e) => onFieldChange(entry.id, "reason", capitalizeFirstLetter(e.target.value))}
+                  maxLength={500}
                   placeholder="Reason for leaving"
                 />
               </Field>
@@ -1488,10 +1506,12 @@ const EducationRow = React.memo(function EducationRow({
         >
           <FlameInput
             value={entry.major_subject}
-            onChange={(e) =>
-              onFieldChange(entry.id, "major_subject", e.target.value)
-            }
+            // onChange={(e) =>
+            //   onFieldChange(entry.id, "major_subject", e.target.value)
+            // }
+            onChange={(e) => onFieldChange(entry.id, "major_subject", capitalizeFirstLetter(e.target.value))}
             placeholder="e.g. Computer Science, Pre-Engineering"
+            maxLength={80}
           />
         </Field>
 
