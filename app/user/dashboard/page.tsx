@@ -221,7 +221,9 @@ const mapEducation = (list: any[]): EducationEntry[] =>
     country: e.countryId != null ? String(e.countryId) : "",
     city: e.cityId != null ? String(e.cityId) : e.cityOther ? "other" : "",
     city_other: e.cityOther ?? "",
-    passing_year: String(e.passingYear ?? ""),
+    start_date: toMonthInput(e.startDate),
+    end_date: e.isOngoing ? "" : toMonthInput(e.endDate),
+    is_ongoing: Boolean(e.isOngoing),
     obtained_marks_gpa: String(e.obtainedMarks ?? ""),
     total_marks_gpa: String(e.totalMarks ?? ""),
     division_grade: e.divisionGrade ?? "",
@@ -1146,7 +1148,13 @@ function ExperienceTab({
                   // onChange={(e) =>
                   //   onFieldChange(entry.id, "job_title", e.target.value)
                   // }
-                  onChange={(e) => onFieldChange(entry.id, "job_title", capitalizeFirstLetter(e.target.value))}
+                  onChange={(e) =>
+                    onFieldChange(
+                      entry.id,
+                      "job_title",
+                      capitalizeFirstLetter(e.target.value),
+                    )
+                  }
                   placeholder="Software Engineer"
                   maxLength={80}
                 />
@@ -1162,8 +1170,13 @@ function ExperienceTab({
                   // onChange={(e) =>
                   //   onFieldChange(entry.id, "company", e.target.value)
                   // }
-                  onChange={(e) => onFieldChange(entry.id, "company", capitalizeFirstLetter(e.target.value))}
-
+                  onChange={(e) =>
+                    onFieldChange(
+                      entry.id,
+                      "company",
+                      capitalizeFirstLetter(e.target.value),
+                    )
+                  }
                   placeholder="SSGC"
                   maxLength={80}
                 />
@@ -1261,7 +1274,13 @@ function ExperienceTab({
                   // onChange={(e) =>
                   //   onFieldChange(entry.id, "responsibilities", e.target.value)
                   // }
-                  onChange={(e) => onFieldChange(entry.id, "responsibilities", capitalizeFirstLetter(e.target.value))}
+                  onChange={(e) =>
+                    onFieldChange(
+                      entry.id,
+                      "responsibilities",
+                      capitalizeFirstLetter(e.target.value),
+                    )
+                  }
                   maxLength={500}
                   placeholder="Briefly describe your role and achievements"
                 />
@@ -1278,7 +1297,13 @@ function ExperienceTab({
                   // onChange={(e) =>
                   //   onFieldChange(entry.id, "reason", e.target.value)
                   // }
-                  onChange={(e) => onFieldChange(entry.id, "reason", capitalizeFirstLetter(e.target.value))}
+                  onChange={(e) =>
+                    onFieldChange(
+                      entry.id,
+                      "reason",
+                      capitalizeFirstLetter(e.target.value),
+                    )
+                  }
                   maxLength={500}
                   placeholder="Reason for leaving"
                 />
@@ -1312,7 +1337,9 @@ export interface EducationEntry {
   country: string;
   city: string;
   city_other: string;
-  passing_year: string;
+  start_date: string;
+  end_date: string;
+  is_ongoing: boolean;
   obtained_marks_gpa: string;
   total_marks_gpa: string;
   division_grade: string;
@@ -1330,7 +1357,9 @@ export const emptyEducation = (id: number): EducationEntry => ({
   country: "",
   city: "",
   city_other: "",
-  passing_year: "",
+  start_date: "",
+  end_date: "",
+  is_ongoing: false,
   obtained_marks_gpa: "",
   total_marks_gpa: "",
   division_grade: "",
@@ -1341,7 +1370,7 @@ interface EducationRowProps {
   onFieldChange: (
     id: number,
     field: keyof EducationEntry,
-    value: string,
+    value: string | boolean,
   ) => void;
   onRemove: (id: number) => void;
   removeDisabled: boolean;
@@ -1381,7 +1410,7 @@ const EducationRow = React.memo(function EducationRow({
 
   const isGroupOther = entry.qualification_group_id === "other";
   const isQualOther = entry.qualification_id === "other";
-
+  const currentMonth = new Date().toISOString().slice(0, 7);
   return (
     <RepeatableCard
       onRemove={() => onRemove(entry.id)}
@@ -1509,7 +1538,13 @@ const EducationRow = React.memo(function EducationRow({
             // onChange={(e) =>
             //   onFieldChange(entry.id, "major_subject", e.target.value)
             // }
-            onChange={(e) => onFieldChange(entry.id, "major_subject", capitalizeFirstLetter(e.target.value))}
+            onChange={(e) =>
+              onFieldChange(
+                entry.id,
+                "major_subject",
+                capitalizeFirstLetter(e.target.value),
+              )
+            }
             placeholder="e.g. Computer Science, Pre-Engineering"
             maxLength={80}
           />
@@ -1546,85 +1581,120 @@ const EducationRow = React.memo(function EducationRow({
         )}
 
         <Field
-          label="Passing Year"
+          label="Start Date"
           required
-          error={errors[`${entry.id}_passing_year`]}
+          error={errors[`${entry.id}_start_date`]}
         >
           <FlameInput
-            type="text"
-            maxLength={4}
-            inputMode="numeric"
-            value={entry.passing_year}
+            type="month"
+            max={currentMonth}
+            value={entry.start_date}
             onChange={(e) =>
-              onFieldChange(
-                entry.id,
-                "passing_year",
-                e.target.value.replace(/\D+/g, ""),
-              )
+              onFieldChange(entry.id, "start_date", e.target.value)
             }
-            placeholder="YYYY"
           />
         </Field>
 
         <Field
-          label="Obtained Marks / CGPA"
-          required
-          error={errors[`${entry.id}_obtained_marks_gpa`]}
+          label="End Date"
+          required={!entry.is_ongoing}
+          error={errors[`${entry.id}_end_date`]}
         >
           <FlameInput
-            type="text"
-            inputMode="decimal"
-            value={entry.obtained_marks_gpa}
+            type="month"
+            min={entry.start_date || undefined}
+            max={currentMonth}
+            disabled={entry.is_ongoing}
+            value={entry.end_date}
             onChange={(e) =>
-              onFieldChange(
-                entry.id,
-                "obtained_marks_gpa",
-                e.target.value.replace(/[^\d.]/g, ""),
-              )
+              onFieldChange(entry.id, "end_date", e.target.value)
             }
-            placeholder="e.g. 3.75 or 850"
           />
         </Field>
 
-        <Field
-          label="Total Marks / CGPA"
-          required
-          error={errors[`${entry.id}_total_marks_gpa`]}
-        >
-          <FlameInput
-            type="text"
-            inputMode="decimal"
-            value={entry.total_marks_gpa}
-            onChange={(e) =>
-              onFieldChange(
-                entry.id,
-                "total_marks_gpa",
-                e.target.value.replace(/[^\d.]/g, ""),
-              )
-            }
-            placeholder="e.g. 4.00 or 1100"
-          />
+        <Field as="div" label="Qualification Status">
+          <label className="flex items-center gap-2 py-2 text-sm text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={entry.is_ongoing}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                onFieldChange(entry.id, "is_ongoing", checked);
+                if (checked) onFieldChange(entry.id, "end_date", "");
+              }}
+            />
+            Currently studying (ongoing)
+          </label>
         </Field>
 
-        <Field
-          label="Division / Grade"
-          required
-          error={errors[`${entry.id}_division_grade`]}
-        >
-          <FlameSelect
-            value={entry.division_grade}
-            onChange={(e) =>
-              onFieldChange(entry.id, "division_grade", e.target.value)
-            }
-          >
-            <option value="">Select division / grade</option>
-            <option value="1st Division / A+">1st Division / A+</option>
-            <option value="1st Division / A">1st Division / A</option>
-            <option value="1st Division / B">1st Division / B</option>
-            <option value="2nd Division / C">2nd Division / C</option>
-            <option value="3rd Division / D">3rd Division / D</option>
-          </FlameSelect>
-        </Field>
+        {!entry.is_ongoing && (
+          <>
+            <Field
+              label="Obtained Marks / CGPA"
+              required
+              error={errors[`${entry.id}_obtained_marks_gpa`]}
+            >
+              <FlameInput
+                type="text"
+                inputMode="decimal"
+                value={entry.obtained_marks_gpa}
+                onChange={(e) =>
+                  onFieldChange(
+                    entry.id,
+                    "obtained_marks_gpa",
+                    e.target.value.replace(/[^\d.]/g, ""),
+                  )
+                }
+                placeholder="e.g. 3.75 or 850"
+              />
+            </Field>
+
+            <Field
+              label="Total Marks / CGPA"
+              required
+              error={errors[`${entry.id}_total_marks_gpa`]}
+            >
+              <FlameInput
+                type="text"
+                inputMode="decimal"
+                value={entry.total_marks_gpa}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^\d.]/g, "");
+                  onFieldChange(entry.id, "total_marks_gpa", v);
+                  if (errors[`${entry.id}_obtained_marks_gpa`]) {
+                    onFieldChange(
+                      entry.id,
+                      "obtained_marks_gpa",
+                      entry.obtained_marks_gpa,
+                    );
+                  }
+                }}
+                placeholder="e.g. 4.00 or 1100"
+              />
+            </Field>
+
+            <Field
+              label="Division / Grade"
+              required
+              error={errors[`${entry.id}_division_grade`]}
+            >
+              <FlameSelect
+                value={entry.division_grade}
+                onChange={(e) =>
+                  onFieldChange(entry.id, "division_grade", e.target.value)
+                }
+              >
+                <option value="">Select division / grade</option>
+                <option value="1st Division / A+">1st Division / A+</option>
+                <option value="1st Division / A">1st Division / A</option>
+                <option value="1st Division / B">1st Division / B</option>
+                <option value="2nd Division / C">2nd Division / C</option>
+                <option value="3rd Division / D">3rd Division / D</option>
+              </FlameSelect>
+            </Field>
+          </>
+        )}
       </div>
     </RepeatableCard>
   );
@@ -1635,7 +1705,7 @@ interface EducationTabProps {
   onFieldChange: (
     id: number,
     field: keyof EducationEntry,
-    value: string,
+    value: string | boolean,
   ) => void;
   onAdd: () => void;
   onRemove: (id: number) => void;
@@ -2745,6 +2815,13 @@ function cleanEducation(list: EducationEntry[]) {
     institute_other:
       e.institute_id === "other" ? trimmed(e.institute_other) : "",
     city_other: e.city === "other" ? trimmed(e.city_other) : "",
+    // ongoing qualifications have no end date, result or grade
+    end_date: e.is_ongoing ? "" : e.end_date,
+    obtained_marks_gpa: e.is_ongoing ? "" : e.obtained_marks_gpa,
+    total_marks_gpa: e.is_ongoing ? "" : e.total_marks_gpa,
+    division_grade: e.is_ongoing ? "" : e.division_grade,
+    // kept so an existing backend that still expects passing_year keeps working
+    passing_year: e.is_ongoing ? "" : e.end_date.slice(0, 4),
   }));
 }
 
@@ -3189,6 +3266,9 @@ function ProfileTabsContent() {
         }
         if (!entry.end_date) {
           newErrors[`${entry.id}_end_date`] = "End date is required";
+        } else if (entry.start_date && entry.end_date < entry.start_date) {
+          newErrors[`${entry.id}_end_date`] =
+            "End date cannot be before the start date";
         }
         if (!entry.country) {
           newErrors[`${entry.id}_country`] = "Country is required";
@@ -3210,8 +3290,15 @@ function ProfileTabsContent() {
     }
 
     if (activeTab === "education") {
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(
+        now.getMonth() + 1,
+      ).padStart(2, "0")}`;
+      const NUMBER_REGEX = /^\d+(\.\d{1,2})?$/;
+
       formData.education.forEach((entry) => {
         const p = `${entry.id}_`;
+
         if (!str(entry.qualification_group_id)) {
           newErrors[`${p}qualification_group_id`] =
             "Qualification level is required";
@@ -3226,18 +3313,66 @@ function ProfileTabsContent() {
         if (!str(entry.major_subject)) {
           newErrors[`${p}major_subject`] = "Major subject is required";
         }
-        if (!str(entry.passing_year)) {
-          newErrors[`${p}passing_year`] = "Passing year is required";
+
+        // Start date
+        if (!entry.start_date) {
+          newErrors[`${p}start_date`] = "Start date is required";
+        } else if (entry.start_date > currentMonth) {
+          newErrors[`${p}start_date`] = "Start date cannot be in the future";
+        } else if (
+          formData.date_of_birth &&
+          Number(entry.start_date.slice(0, 4)) <
+            new Date(formData.date_of_birth).getFullYear() + 5
+        ) {
+          newErrors[`${p}start_date`] =
+            "Start date is too early for your date of birth";
         }
-        if (!str(entry.obtained_marks_gpa)) {
-          newErrors[`${p}obtained_marks_gpa`] =
-            "Obtained marks/CGPA is required";
-        }
-        if (!str(entry.total_marks_gpa)) {
-          newErrors[`${p}total_marks_gpa`] = "Total marks/CGPA is required";
-        }
-        if (!str(entry.division_grade)) {
-          newErrors[`${p}division_grade`] = "Division / Grade is required";
+
+        // End date (only when completed)
+        if (!entry.is_ongoing) {
+          if (!entry.end_date) {
+            newErrors[`${p}end_date`] = "End date is required";
+          } else if (entry.end_date > currentMonth) {
+            newErrors[`${p}end_date`] =
+              "End date cannot be in the future. Tick 'Currently studying' if it is ongoing";
+          } else if (entry.start_date && entry.end_date < entry.start_date) {
+            newErrors[`${p}end_date`] =
+              "End date cannot be before the start date";
+          }
+
+          // Marks / CGPA (only when completed)
+          const obtainedStr = str(entry.obtained_marks_gpa);
+          const totalStr = str(entry.total_marks_gpa);
+
+          let totalValid = false;
+          if (!totalStr) {
+            newErrors[`${p}total_marks_gpa`] = "Total marks/CGPA is required";
+          } else if (!NUMBER_REGEX.test(totalStr)) {
+            newErrors[`${p}total_marks_gpa`] =
+              "Enter a valid number (up to 2 decimals)";
+          } else if (Number(totalStr) <= 0) {
+            newErrors[`${p}total_marks_gpa`] = "Total must be greater than 0";
+          } else {
+            totalValid = true;
+          }
+
+          if (!obtainedStr) {
+            newErrors[`${p}obtained_marks_gpa`] =
+              "Obtained marks/CGPA is required";
+          } else if (!NUMBER_REGEX.test(obtainedStr)) {
+            newErrors[`${p}obtained_marks_gpa`] =
+              "Enter a valid number (up to 2 decimals)";
+          } else if (Number(obtainedStr) <= 0) {
+            newErrors[`${p}obtained_marks_gpa`] =
+              "Obtained must be greater than 0";
+          } else if (totalValid && Number(obtainedStr) > Number(totalStr)) {
+            newErrors[`${p}obtained_marks_gpa`] =
+              "Obtained cannot be greater than total";
+          }
+
+          if (!str(entry.division_grade)) {
+            newErrors[`${p}division_grade`] = "Division / Grade is required";
+          }
         }
       });
     }

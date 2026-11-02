@@ -4,7 +4,7 @@ import { verifyToken } from "@/app/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import { existsSync, readFileSync } from "fs";
 import path from "path";
-import { buildCvPdf, CV_PROFILE_INCLUDE } from "@/app/lib/generateCv";
+import { buildCvPdf, CV_PROFILE_INCLUDE } from "@/app/lib/generateCv_backup";
 const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads", "jobs");
 const ALLOWED_MIME = new Set([
   "application/pdf",

@@ -1,6 +1,6 @@
 import prisma from "@/app/lib/db";
 import { NextRequest, NextResponse } from "next/server";
-import { buildCvPdf, CV_PROFILE_INCLUDE } from "@/app/lib/generateCv";
+import { buildCvPdf, CV_PROFILE_INCLUDE } from "@/app/lib/generateCv_backup";
 import path from "path";
 import { existsSync, readFileSync } from "fs";
 

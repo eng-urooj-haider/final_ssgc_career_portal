@@ -200,97 +200,170 @@ export async function PATCH(req: NextRequest) {
 
   // --- Education tab -----------------------------------------------------
   if (body.education) {
-    const items: any[] = body.education;
+  const items: any[] = body.education;
 
-    // Keep your existing "other" checks
-    for (const e of items) {
+  // Parse "YYYY-MM" (or "YYYY-MM-DD") into a UTC Date, or null if invalid/empty
+  const monthToDate = (v: unknown): Date | null => {
+    if (typeof v !== "string" || !v.trim()) return null;
+    const s = v.trim();
+    const full = /^\d{4}-\d{2}$/.test(s) ? `${s}-01` : s;
+    const d = new Date(full);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const now = new Date();
+  const startOfNextMonth = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+  );
+
+  for (const e of items) {
+    // Existing "other" checks
+    if (
+      e.qualification_group_id === "other" &&
+      !textOrNull(e.qualification_group_other)
+    )
+      return NextResponse.json(
+        { error: "Qualification level name required" },
+        { status: 400 },
+      );
+    if (e.qualification_id === "other" && !textOrNull(e.qualification_other))
+      return NextResponse.json(
+        { error: "Degree name required" },
+        { status: 400 },
+      );
+    if (e.institute_id === "other" && !textOrNull(e.institute_other))
+      return NextResponse.json(
+        { error: "Institute name required" },
+        { status: 400 },
+      );
+
+    // Dates
+    const start = monthToDate(e.start_date);
+    if (!start)
+      return NextResponse.json(
+        { error: "Education start date is required" },
+        { status: 400 },
+      );
+    if (start >= startOfNextMonth)
+      return NextResponse.json(
+        { error: "Education start date cannot be in the future" },
+        { status: 400 },
+      );
+
+    if (!e.is_ongoing) {
+      const end = monthToDate(e.end_date);
+      if (!end)
+        return NextResponse.json(
+          { error: "Education end date is required for completed qualifications" },
+          { status: 400 },
+        );
+      if (end < start)
+        return NextResponse.json(
+          { error: "Education end date cannot be before the start date" },
+          { status: 400 },
+        );
+      if (end >= startOfNextMonth)
+        return NextResponse.json(
+          { error: "Education end date cannot be in the future" },
+          { status: 400 },
+        );
+
+      // Result fields, required only when completed
+      const obtained = Number(e.obtained_marks_gpa);
+      const total = Number(e.total_marks_gpa);
       if (
-        e.qualification_group_id === "other" &&
-        !textOrNull(e.qualification_group_other)
+        !Number.isFinite(obtained) ||
+        !Number.isFinite(total) ||
+        obtained <= 0 ||
+        total <= 0
       )
         return NextResponse.json(
-          { error: "Qualification level name required" },
+          { error: "Valid obtained and total marks are required" },
           { status: 400 },
         );
-      if (e.qualification_id === "other" && !textOrNull(e.qualification_other))
+      if (obtained > total)
         return NextResponse.json(
-          { error: "Degree name required" },
+          { error: "Obtained marks cannot be greater than total marks" },
           { status: 400 },
         );
-      if (e.institute_id === "other" && !textOrNull(e.institute_other))
+      if (!textOrNull(e.division_grade))
         return NextResponse.json(
-          { error: "Institute name required" },
+          { error: "Division / grade is required" },
           { status: 400 },
         );
     }
+  }
 
-    // Only rows that belong to THIS profile can be updated or deleted.
-    const existing = await prisma.education.findMany({
-      where: { profileId: profile.id },
-      select: { id: true },
-    });
-    const existingIds = new Set(existing.map((e) => e.id));
+  // Only rows that belong to THIS profile can be updated or deleted.
+  const existing = await prisma.education.findMany({
+    where: { profileId: profile.id },
+    select: { id: true },
+  });
+  const existingIds = new Set(existing.map((e) => e.id));
 
-    // Positive ids that belong to this profile = update, anything else = create.
-    const isExisting = (e: any) =>
-      typeof e.id === "number" && e.id > 0 && existingIds.has(e.id);
+  const isExisting = (e: any) =>
+    typeof e.id === "number" && e.id > 0 && existingIds.has(e.id);
 
-    const incomingIds = new Set(
-      items.filter(isExisting).map((e) => e.id as number),
-    );
-    const idsToDelete = existing
-      .map((e) => e.id)
-      .filter((id) => !incomingIds.has(id));
+  const incomingIds = new Set(
+    items.filter(isExisting).map((e) => e.id as number),
+  );
+  const idsToDelete = existing
+    .map((e) => e.id)
+    .filter((id) => !incomingIds.has(id));
 
-    const saved = await prisma.$transaction(async (tx) => {
-      // 1. Delete rows that were removed in the form
-      if (idsToDelete.length > 0) {
-        await tx.education.deleteMany({
-          where: { id: { in: idsToDelete }, profileId: profile.id },
+  const saved = await prisma.$transaction(async (tx) => {
+    if (idsToDelete.length > 0) {
+      await tx.education.deleteMany({
+        where: { id: { in: idsToDelete }, profileId: profile.id },
+      });
+    }
+
+    for (const e of items) {
+      const groupOther = e.qualification_group_id === "other";
+      const qualOther = e.qualification_id === "other";
+      const instOther = e.institute_id === "other";
+      const cityOther = e.city === "other";
+      const ongoing = Boolean(e.is_ongoing);
+
+      const data = {
+        qualificationGroupId: groupOther
+          ? null
+          : toIntOrNull(e.qualification_group_id),
+        qualificationGroupOther: groupOther
+          ? textOrNull(e.qualification_group_other)
+          : null,
+        qualificationId: qualOther ? null : toIntOrNull(e.qualification_id),
+        qualificationOther: qualOther
+          ? textOrNull(e.qualification_other)
+          : null,
+        institutionId: instOther ? null : toIntOrNull(e.institute_id),
+        instituteOther: instOther ? textOrNull(e.institute_other) : null,
+        majorSubject: e.major_subject,
+        countryId: Number(e.country),
+        cityId: cityOther ? null : toIntOrNull(e.city),
+        cityOther: cityOther ? textOrNull(e.city_other) : null,
+
+        startDate: monthToDate(e.start_date)!,
+        endDate: ongoing ? null : monthToDate(e.end_date),
+        isOngoing: ongoing,
+
+        obtainedMarks: ongoing ? null : Number(e.obtained_marks_gpa),
+        totalMarks: ongoing ? null : Number(e.total_marks_gpa),
+        divisionGrade: ongoing ? null : textOrNull(e.division_grade),
+      };
+
+      if (isExisting(e)) {
+        await tx.education.update({ where: { id: e.id }, data });
+      } else {
+        await tx.education.create({
+          data: { ...data, profileId: profile.id },
         });
       }
+    }
+  });
 
-      // 2. Update existing rows or create new ones
-      for (const e of items) {
-        const groupOther = e.qualification_group_id === "other";
-        const qualOther = e.qualification_id === "other";
-        const instOther = e.institute_id === "other";
-        const cityOther = e.city === "other";
-
-        const data = {
-          qualificationGroupId: groupOther
-            ? null
-            : toIntOrNull(e.qualification_group_id),
-          qualificationGroupOther: groupOther
-            ? textOrNull(e.qualification_group_other)
-            : null,
-          qualificationId: qualOther ? null : toIntOrNull(e.qualification_id),
-          qualificationOther: qualOther
-            ? textOrNull(e.qualification_other)
-            : null,
-          institutionId: instOther ? null : toIntOrNull(e.institute_id),
-          instituteOther: instOther ? textOrNull(e.institute_other) : null,
-          majorSubject: e.major_subject,
-          countryId: Number(e.country),
-          cityId: cityOther ? null : toIntOrNull(e.city),
-          cityOther: cityOther ? textOrNull(e.city_other) : null,
-          passingYear: Number(e.passing_year),
-          obtainedMarks: Number(e.obtained_marks_gpa),
-          totalMarks: Number(e.total_marks_gpa),
-          divisionGrade: e.division_grade || null,
-        };
-        if (isExisting(e)) {
-          await tx.education.update({ where: { id: e.id }, data });
-        } else {
-          await tx.education.create({
-            data: { ...data, profileId: profile.id },
-          });
-        }
-      }
-    });
-
-    return NextResponse.json({ ok: true, data: saved });
-  }
+  return NextResponse.json({ ok: true, data: saved });
+}
 
   // --- Certificates tab --------------------------------------------------
   if (body.certificates) {

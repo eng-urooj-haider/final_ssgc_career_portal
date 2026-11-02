@@ -2,6 +2,7 @@
 import ExcelJS from "exceljs";
 import { PassThrough, Readable } from "node:stream";
 import prisma from "@/app/lib/db";
+import { calcAge } from "@/app/lib/validation/formatted_dob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,20 +48,35 @@ export async function GET(
   const certLabels = ["Name", "Organisation", "Issue Date"];
 
   const headers = [
-    "Job Code",
-    "Job Title",
-    "Applied On",
-    "Email",
-    "First Name",
-    "Last Name",
+    "SNO",
+    "User Account ID",
+    "Position Code",
+    "Con",
     "CNIC",
-    "Mobile",
-    "Gender",
+    "Position Title",
+    "Name",
+    "Father Name",
+    "Current Address",
+    "Contact Number",
     "DOB",
-    "CV",
-    ...rep("Exp", MAX_EXP, expLabels),
-    ...rep("Edu", MAX_EDU, eduLabels),
-    ...rep("Cert", MAX_CERT, certLabels),
+    "Advertisment Date",
+    "Age",
+    "Age Digits",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "Subject 1",
+    "Subject 2",
+    "Subject 3",
+    "Subject 4",
+    "Subject 5",
+    "Subject 6",
+    // ...rep("Exp", MAX_EXP, expLabels),
+    // ...rep("Edu", MAX_EDU, eduLabels),
+    // ...rep("Cert", MAX_CERT, certLabels),
   ];
 
   // ---- stream plumbing ------------------------------------------------
@@ -78,6 +94,7 @@ export async function GET(
   (async () => {
     try {
       let cursor: number | undefined;
+      let sno = 1;
       for (;;) {
         const apps = await prisma.jobApplication.findMany({
           where: { jobId },
@@ -90,14 +107,17 @@ export async function GET(
             cv: true,
             selectedExperienceIds: true,
             selectedCertificateIds: true,
-            job: { select: { jobCode: true, title: true } },
+            job: { select: { jobCode: true, title: true, createdAt: true } },
             user: {
               select: {
+                id: true,
                 email: true,
                 profile: {
                   select: {
                     firstName: true,
                     lastName: true,
+                    fatherName: true,
+                    currentAddress: true,
                     cnic: true,
                     gender: true,
                     dateOfBirth: true,
@@ -106,10 +126,11 @@ export async function GET(
                     experiences: { orderBy: { startDate: "desc" } },
                     certificates: true,
                     education: {
-                      orderBy: { passingYear: "desc" },
+                      //   orderBy: { passingYear: "desc" },
                       select: {
+                        qualificationId: true,
                         majorSubject: true,
-                        passingYear: true,
+                        // passingYear: true,
                         obtainedMarks: true,
                         totalMarks: true,
                         divisionGrade: true,
@@ -137,40 +158,70 @@ export async function GET(
             selCert.includes(c.id),
           );
           const edus = p?.education ?? [];
+          const asOn = a.job.createdAt ?? new Date();
+          const age = calcAge(p?.dateOfBirth, asOn);
+
+          // Map qualifications and subjects to slots 1 through 6
+          const eduMap = new Map<number, { qualName: string; major: string }>();
+          edus.forEach((edu, index) => {
+            const slot = index + 1; // 1st education -> slot 1, 2nd -> slot 2, etc.
+            if (slot <= 6) {
+              eduMap.set(slot, {
+                qualName:
+                  edu.qualification?.name ?? edu.qualificationOther ?? "#N/A",
+                major: edu.majorSubject ?? "#N/A",
+              });
+            }
+          });
+
+          // Build arrays for columns 1..6 and Subject 1..6
+          const qualColumns = [1, 2, 3, 4, 5, 6].map(
+            (slot) => eduMap.get(slot)?.qualName ?? "#N/A",
+          );
+          const subjectColumns = [1, 2, 3, 4, 5, 6].map(
+            (slot) => eduMap.get(slot)?.major ?? "#N/A",
+          );
 
           ws.addRow([
+            sno++,
+            a.user.id,
             a.job.jobCode,
-            a.job.title,
-            d(a.createdAt),
-            a.user.email,
-            p?.firstName ?? "",
-            p?.lastName ?? "",
+            `(${a.job.jobCode})${p?.cnic ?? ""}`,
             p?.cnic ?? "",
+            a.job.title ?? "",
+            `${p?.firstName ?? ""} ${p?.lastName ?? ""}`.trim(),
+            p?.fatherName ?? "",
+            p?.currentAddress ?? "",
             `${p?.mobilePrefix ?? ""}${p?.mobileNumber ?? ""}`,
-            p?.gender ?? "",
             d(p?.dateOfBirth),
-            a.cv ?? "",
-            ...pad(exps, MAX_EXP, 6, (e) => [
-              e.jobTitle,
-              e.company,
-              (e.city && cityMap.get(e.city)) || e.cityOther || "",
-              d(e.startDate),
-              e.endDate ? d(e.endDate) : "Present",
-              e.salary ? Number(e.salary) : "",
-            ]),
-            ...pad(edus, MAX_EDU, 6, (e) => [
-              e.qualification.name,
-              e.instituteOther || e.institution.name,
-              e.majorSubject,
-              e.passingYear,
-              `${e.obtainedMarks}/${e.totalMarks}`,
-              e.divisionGrade ?? "",
-            ]),
-            ...pad(certs, MAX_CERT, 3, (c) => [
-              c.certificateName,
-              c.organisation,
-              d(c.issueDate),
-            ]),
+            d(a.job.createdAt),
+            age.decimal,
+            age.digits,
+            ...qualColumns,
+            ...subjectColumns,
+
+            // a.cv ?? "",
+            // ...pad(exps, MAX_EXP, 6, (e) => [
+            //   e.jobTitle,
+            //   e.company,
+            //   (e.city && cityMap.get(e.city)) || e.cityOther || "",
+            //   d(e.startDate),
+            //   e.endDate ? d(e.endDate) : "Present",
+            //   e.salary ? Number(e.salary) : "",
+            // ]),
+            // ...pad(edus, MAX_EDU, 6, (e) => [
+            //   e.qualification.name,
+            //   e.instituteOther || e.institution.name,
+            //   e.majorSubject,
+            //   //   e.passingYear,
+            //   `${e.obtainedMarks}/${e.totalMarks}`,
+            //   e.divisionGrade ?? "",
+            // ]),
+            // ...pad(certs, MAX_CERT, 3, (c) => [
+            //   c.certificateName,
+            //   c.organisation,
+            //   d(c.issueDate),
+            // ]),
           ]).commit();
         }
         cursor = apps[apps.length - 1].id;
