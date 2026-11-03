@@ -3,14 +3,13 @@ import ExcelJS from "exceljs";
 import { PassThrough, Readable } from "node:stream";
 import prisma from "@/app/lib/db";
 import { calcAge } from "@/app/lib/validation/formatted_dob";
+import { fmtMonths, workedMonths } from "@/app/lib/experience";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BATCH = 500;
-const MAX_EXP = 5,
-  MAX_EDU = 3,
-  MAX_CERT = 5;
+const MAX_EXP_SLOTS = 10;
 
 const d = (v?: Date | null) => (v ? v.toISOString().slice(0, 10) : "");
 const ids = (v: unknown): number[] => (Array.isArray(v) ? v.map(Number) : []);
@@ -35,18 +34,7 @@ export async function GET(
   const cityMap = new Map(cities.map((c) => [c.id, c.cityName]));
   const countryMap = new Map(countries.map((c) => [c.id, c.countryName]));
 
-  // ---- headers (fixed up front) ---------------------------------------
-  const expLabels = ["Title", "Company", "City", "Start", "End", "Salary"];
-  const eduLabels = [
-    "Qualification",
-    "Institution",
-    "Major",
-    "Year",
-    "Marks",
-    "Grade",
-  ];
-  const certLabels = ["Name", "Organisation", "Issue Date"];
-
+  // ---- headers --------------------------------------------------------
   const headers = [
     "SNO",
     "User Account ID",
@@ -74,9 +62,18 @@ export async function GET(
     "Subject 4",
     "Subject 5",
     "Subject 6",
-    // ...rep("Exp", MAX_EXP, expLabels),
-    // ...rep("Edu", MAX_EDU, eduLabels),
-    // ...rep("Cert", MAX_CERT, certLabels),
+    "Total Experience",
+    "File Name",
+    "12",
+    "23",
+    "34",
+    "45",
+    "56",
+    "67",
+    "7",
+    "8",
+    "9",
+    "10",
   ];
 
   // ---- stream plumbing ------------------------------------------------
@@ -90,7 +87,6 @@ export async function GET(
   });
   ws.addRow(headers).commit();
 
-  // Fire and forget: the response streams while this loop runs
   (async () => {
     try {
       let cursor: number | undefined;
@@ -126,11 +122,9 @@ export async function GET(
                     experiences: { orderBy: { startDate: "desc" } },
                     certificates: true,
                     education: {
-                      //   orderBy: { passingYear: "desc" },
                       select: {
                         qualificationId: true,
                         majorSubject: true,
-                        // passingYear: true,
                         obtainedMarks: true,
                         totalMarks: true,
                         divisionGrade: true,
@@ -150,21 +144,24 @@ export async function GET(
         for (const a of apps) {
           const p = a.user.profile;
           const selExp = ids(a.selectedExperienceIds);
-          const selCert = ids(a.selectedCertificateIds);
           const exps = (p?.experiences ?? []).filter((e) =>
             selExp.includes(e.id),
           );
-          const certs = (p?.certificates ?? []).filter((c) =>
-            selCert.includes(c.id),
-          );
+
+          const cv = a.cv;
           const edus = p?.education ?? [];
           const asOn = a.job.createdAt ?? new Date();
           const age = calcAge(p?.dateOfBirth, asOn);
+          const totalExperience = fmtMonths(
+            workedMonths(
+              exps.map((e) => [e.startDate, e.endDate] as [Date, Date | null]),
+            ).size,
+          );
 
-          // Map qualifications and subjects to slots 1 through 6
+          // Map education
           const eduMap = new Map<number, { qualName: string; major: string }>();
           edus.forEach((edu, index) => {
-            const slot = index + 1; // 1st education -> slot 1, 2nd -> slot 2, etc.
+            const slot = index + 1;
             if (slot <= 6) {
               eduMap.set(slot, {
                 qualName:
@@ -174,7 +171,6 @@ export async function GET(
             }
           });
 
-          // Build arrays for columns 1..6 and Subject 1..6
           const qualColumns = [1, 2, 3, 4, 5, 6].map(
             (slot) => eduMap.get(slot)?.qualName ?? "#N/A",
           );
@@ -182,7 +178,19 @@ export async function GET(
             (slot) => eduMap.get(slot)?.major ?? "#N/A",
           );
 
-          ws.addRow([
+          // Build 10 Experience Columns in "Title:\n...\nCompany Name:\n...\nResponsibility:\n..." format
+          const expColumns = Array.from({ length: MAX_EXP_SLOTS }, (_, index) => {
+            const exp = exps[index];
+            if (!exp) return "#N/A";
+
+            const title = exp.jobTitle ?? "";
+            const company = exp.company ?? "";
+            const responsibilities = exp.responsibility ??  "";
+
+            return `Title:\n${title}\nCompany Name:\n${company}\n\nResponsibility:\n${responsibilities}`;
+          });
+
+          const row = ws.addRow([
             sno++,
             a.user.id,
             a.job.jobCode,
@@ -199,30 +207,17 @@ export async function GET(
             age.digits,
             ...qualColumns,
             ...subjectColumns,
+            totalExperience,
+            cv,
+            ...expColumns,
+          ]);
 
-            // a.cv ?? "",
-            // ...pad(exps, MAX_EXP, 6, (e) => [
-            //   e.jobTitle,
-            //   e.company,
-            //   (e.city && cityMap.get(e.city)) || e.cityOther || "",
-            //   d(e.startDate),
-            //   e.endDate ? d(e.endDate) : "Present",
-            //   e.salary ? Number(e.salary) : "",
-            // ]),
-            // ...pad(edus, MAX_EDU, 6, (e) => [
-            //   e.qualification.name,
-            //   e.instituteOther || e.institution.name,
-            //   e.majorSubject,
-            //   //   e.passingYear,
-            //   `${e.obtainedMarks}/${e.totalMarks}`,
-            //   e.divisionGrade ?? "",
-            // ]),
-            // ...pad(certs, MAX_CERT, 3, (c) => [
-            //   c.certificateName,
-            //   c.organisation,
-            //   d(c.issueDate),
-            // ]),
-          ]).commit();
+          // Enable text wrapping so newlines (\n) render as multi-line cells in Excel
+          row.eachCell((cell) => {
+            cell.alignment = { wrapText: true, vertical: "top" };
+          });
+
+          row.commit();
         }
         cursor = apps[apps.length - 1].id;
       }
@@ -241,22 +236,4 @@ export async function GET(
       "Content-Disposition": `attachment; filename="applicants-job-${jobId}.xlsx"`,
     },
   });
-}
-
-// ---- helpers ----------------------------------------------------------
-function rep(prefix: string, n: number, labels: string[]) {
-  return Array.from({ length: n }, (_, i) =>
-    labels.map((l) => `${prefix} ${i + 1} ${l}`),
-  ).flat();
-}
-
-function pad<T>(
-  items: T[],
-  n: number,
-  width: number,
-  map: (x: T) => (string | number)[],
-) {
-  return Array.from({ length: n }, (_, i) =>
-    items[i] ? map(items[i]) : Array(width).fill(""),
-  ).flat();
 }

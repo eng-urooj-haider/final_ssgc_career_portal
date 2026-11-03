@@ -94,10 +94,10 @@ const columns: ColumnDef<any, JobRow>[] = [
 export default function JobsList() {
   return (
     <main
-      className="min-h-screen px-4 py-10"
+      className="min-h-screen px-8 py-10"
       style={{ background: flame.paper }}
     >
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-8xl">
         {/* Logo */}
         <div className="mb-4">
           <img
