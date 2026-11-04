@@ -377,6 +377,20 @@ function capitalizeFirstLetter(val: string): string {
   return val.charAt(0).toUpperCase() + val.slice(1);
 }
 
+function formatInputText(val: string): string {
+  if (!val) return "";
+
+  // 1. Replace 2 or more consecutive spaces with a single space
+  let cleaned = val.replace(/\s{2,}/g, " ");
+
+  // 2. Capitalize the first letter of every word
+  cleaned = cleaned.replace(
+    /(^|\s)(\S)/g,
+    (match, space, char) => space + char.toUpperCase(),
+  );
+
+  return cleaned;
+}
 const controlBase =
   "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition focus:outline-none focus:border-[#1C6FD9] focus:ring-2 focus:ring-[#1C6FD9]/20 disabled:bg-slate-50 disabled:text-slate-500";
 
@@ -721,9 +735,12 @@ function PersonalTab({ formData, onChange, errors }: PersonalTabProps) {
           <FlameInput
             name="father_name"
             value={formData.father_name || ""}
-            onChange={onChange}
             placeholder="Father's full name"
             maxLength={60}
+            onChange={(e) => {
+              e.target.value = capitalizeAfterSpace(e.target.value);
+              onChange(e);
+            }}
           />
         </Field>
 
@@ -1152,7 +1169,7 @@ function ExperienceTab({
                     onFieldChange(
                       entry.id,
                       "job_title",
-                      capitalizeFirstLetter(e.target.value),
+                      capitalizeAfterSpace(e.target.value),
                     )
                   }
                   placeholder="Software Engineer"
@@ -1174,7 +1191,7 @@ function ExperienceTab({
                     onFieldChange(
                       entry.id,
                       "company",
-                      capitalizeFirstLetter(e.target.value),
+                      capitalizeAfterSpace(e.target.value),
                     )
                   }
                   placeholder="SSGC"
@@ -1542,7 +1559,7 @@ const EducationRow = React.memo(function EducationRow({
               onFieldChange(
                 entry.id,
                 "major_subject",
-                capitalizeFirstLetter(e.target.value),
+                capitalizeAfterSpace(e.target.value),
               )
             }
             placeholder="e.g. Computer Science, Pre-Engineering"
@@ -1866,8 +1883,13 @@ export function CertificatesTab({
                 <FlameInput
                   value={entry.name || ""}
                   onChange={(e) =>
-                    onFieldChange(entry.id, "name", e.target.value)
+                    onFieldChange(
+                      entry.id,
+                      "name",
+                      capitalizeAfterSpace(e.target.value),
+                    )
                   }
+                  maxLength={100}
                   placeholder="e.g. AWS Certified Solutions Architect"
                 />
               </Field>
@@ -1880,8 +1902,13 @@ export function CertificatesTab({
                 <FlameInput
                   value={entry.organisation || ""}
                   onChange={(e) =>
-                    onFieldChange(entry.id, "organisation", e.target.value)
+                    onFieldChange(
+                      entry.id,
+                      "organisation",
+                      capitalizeAfterSpace(e.target.value),
+                    )
                   }
+                  maxLength={100}
                   placeholder="e.g. Amazon Web Services"
                 />
               </Field>
@@ -2041,8 +2068,13 @@ function MembershipsTab({
                 <FlameInput
                   value={entry.organisation}
                   onChange={(e) =>
-                    onFieldChange(entry.id, "organisation", e.target.value)
+                    onFieldChange(
+                      entry.id,
+                      "organisation",
+                      capitalizeAfterSpace(e.target.value),
+                    )
                   }
+                  maxLength={100}
                   placeholder="e.g. Pakistan Engineering Council"
                 />
               </Field>
@@ -2054,8 +2086,13 @@ function MembershipsTab({
                 <FlameInput
                   value={entry.membership_type}
                   onChange={(e) =>
-                    onFieldChange(entry.id, "membership_type", e.target.value)
+                    onFieldChange(
+                      entry.id,
+                      "membership_type",
+                      capitalizeAfterSpace(e.target.value),
+                    )
                   }
+                  maxLength={100}
                   placeholder="e.g. Associate Member"
                 />
               </Field>
@@ -2147,10 +2184,12 @@ function AchievementsTab({
               >
                 <FlameInput
                   value={entry.title || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "title", e.target.value)
-                  }
+                   onChange={(e) => {
+                    const formattedValue = formatInputText(e.target.value);
+                    onFieldChange(entry.id, "title", formattedValue);
+                  }}
                   placeholder="e.g. Employee of the Year"
+                  maxLength={100}
                 />
               </Field>
 
@@ -2161,10 +2200,11 @@ function AchievementsTab({
               >
                 <FlameInput
                   value={entry.issuer || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "issuer", e.target.value)
-                  }
-                  placeholder="e.g. Company Management"
+                   onChange={(e) => {
+                    const formattedValue = formatInputText(e.target.value);
+                    onFieldChange(entry.id, "issuer", formattedValue);
+                  }}
+                  maxLength={100}
                 />
               </Field>
 
@@ -2193,6 +2233,7 @@ function AchievementsTab({
                   onChange={(e) =>
                     onFieldChange(entry.id, "description", e.target.value)
                   }
+                  maxLength={700}
                   placeholder="Briefly describe what this achievement was awarded for"
                 />
               </Field>
@@ -2267,9 +2308,11 @@ function ProjectsTab({
               >
                 <FlameInput
                   value={entry.project_title || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "project_title", e.target.value)
-                  }
+                   onChange={(e) => {
+                    const formattedValue = formatInputText(e.target.value);
+                    onFieldChange(entry.id, "project_title", formattedValue);
+                  }}
+                  maxLength={100}
                   placeholder="e.g. Pipeline Monitoring IoT System"
                 />
               </Field>
@@ -2313,6 +2356,7 @@ function ProjectsTab({
                   onChange={(e) =>
                     onFieldChange(entry.id, "description", e.target.value)
                   }
+                  maxLength={700}
                   placeholder="Describe the objective, technologies used, and outcomes"
                 />
               </Field>
@@ -2393,9 +2437,10 @@ function ReferencesTab({
               >
                 <FlameInput
                   value={entry.name || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "name", e.target.value)
-                  }
+                  onChange={(e) => {
+                    const formattedValue = formatInputText(e.target.value);
+                    onFieldChange(entry.id, "name", formattedValue);
+                  }}
                   placeholder="e.g. Dr. Ahmed Khan"
                 />
               </Field>
@@ -2407,9 +2452,10 @@ function ReferencesTab({
               >
                 <FlameInput
                   value={entry.designation || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "designation", e.target.value)
-                  }
+                  onChange={(e) => {
+                    const formattedValue = formatInputText(e.target.value);
+                    onFieldChange(entry.id, "designation", formattedValue);
+                  }}
                   placeholder="e.g. General Manager"
                 />
               </Field>
@@ -2421,9 +2467,10 @@ function ReferencesTab({
               >
                 <FlameInput
                   value={entry.organisation || ""}
-                  onChange={(e) =>
-                    onFieldChange(entry.id, "organisation", e.target.value)
-                  }
+                  onChange={(e) => {
+                    const formattedValue = formatInputText(e.target.value);
+                    onFieldChange(entry.id, "organisation", formattedValue);
+                  }}
                   placeholder="e.g. ABC Corporation"
                 />
               </Field>
@@ -2558,7 +2605,7 @@ function SkillsTab({ data, onChange, errors }: SkillsTabProps) {
             <div className="flex gap-2 mb-3">
               <FlameInput
                 value={coreInput}
-                onChange={(e) => setCoreInput(e.target.value)}
+                onChange={(e) => setCoreInput(formatInputText(e.target.value))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -2606,7 +2653,7 @@ function SkillsTab({ data, onChange, errors }: SkillsTabProps) {
             <div className="flex gap-2 mb-3">
               <FlameInput
                 value={toolInput}
-                onChange={(e) => setToolInput(e.target.value)}
+                onChange={(e) => setToolInput(formatInputText(e.target.value))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -2671,7 +2718,7 @@ function SkillsTab({ data, onChange, errors }: SkillsTabProps) {
                     <FlameInput
                       value={lang.language}
                       onChange={(e) =>
-                        updateLanguage(index, "language", e.target.value)
+                        updateLanguage(index, "language", formatInputText(e.target.value))
                       }
                       placeholder="e.g. English, Urdu, Sindhi"
                     />
@@ -3379,6 +3426,8 @@ function ProfileTabsContent() {
 
     if (activeTab === "certificates") {
       formData.certificates.forEach((entry) => {
+        const issued = new Date(entry.issue_date);
+        const today = new Date();
         if (!entry.name.trim()) {
           newErrors[`${entry.id}_name`] = "Certificate name is required";
         }
@@ -3388,6 +3437,9 @@ function ProfileTabsContent() {
         }
         if (!entry.issue_date) {
           newErrors[`${entry.id}_issue_date`] = "Issue date is required";
+        } else if (issued > today) {
+          newErrors[`${entry.id}_issue_date`] =
+            "Issue date cannot be in the future";
         }
         if (!entry.document) {
           newErrors[`${entry.id}_document`] = "Document is required";
@@ -3396,16 +3448,52 @@ function ProfileTabsContent() {
     }
 
     if (activeTab === "memberships") {
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(
+        now.getMonth() + 1,
+      ).padStart(2, "0")}`;
+
       formData.memberships.forEach((entry) => {
-        if (!entry.organisation.trim()) {
+        // Organisation
+        const org = entry.organisation.trim();
+        if (!org) {
           newErrors[`${entry.id}_organisation`] = "Organisation is required";
+        } else if (org.length < 2) {
+          newErrors[`${entry.id}_organisation`] =
+            "Organisation must be at least 2 characters";
+        } else if (!/[A-Za-z\u0600-\u06FF]/.test(org)) {
+          newErrors[`${entry.id}_organisation`] =
+            "Organisation must contain letters";
         }
-        if (!entry.membership_type.trim()) {
+
+        // Membership type
+        const type = entry.membership_type.trim();
+        if (!type) {
           newErrors[`${entry.id}_membership_type`] =
             "Membership type is required";
+        } else if (type.length < 2) {
+          newErrors[`${entry.id}_membership_type`] =
+            "Membership type must be at least 2 characters";
+        } else if (!/[A-Za-z\u0600-\u06FF]/.test(type)) {
+          newErrors[`${entry.id}_membership_type`] =
+            "Membership type must contain letters";
         }
-        if (!entry.member_since.trim()) {
+
+        // Member since (YYYY-MM)
+        const since = entry.member_since.trim();
+        if (!since) {
           newErrors[`${entry.id}_member_since`] = "Member since is required";
+        } else if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(since)) {
+          newErrors[`${entry.id}_member_since`] = "Enter a valid month";
+        } else if (since > currentMonth) {
+          newErrors[`${entry.id}_member_since`] =
+            "Member since cannot be in the future";
+        } else if (formData.date_of_birth) {
+          const dobYear = new Date(formData.date_of_birth).getFullYear();
+          if (Number(since.slice(0, 4)) < dobYear + 16) {
+            newErrors[`${entry.id}_member_since`] =
+              "Member since is too early for your date of birth";
+          }
         }
       });
     }
@@ -3452,8 +3540,15 @@ function ProfileTabsContent() {
         // if (!entry.email.trim()) {
         //   newErrors[`${entry.id}_email`] = "Email address is required";
         // }
-        if (!entry.phone.trim()) {
+        const phone = entry.phone.trim();
+        if (!phone) {
           newErrors[`${entry.id}_phone`] = "Phone number is required";
+        } else if (!/^\d+$/.test(phone)) {
+          newErrors[`${entry.id}_phone`] =
+            "Phone number must contain digits only";
+        } else if (!/^0\d{9,10}$/.test(phone)) {
+          newErrors[`${entry.id}_phone`] =
+            "Enter a valid number, e.g. 03001234567 or 02112345678";
         }
       });
     }
